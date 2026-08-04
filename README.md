@@ -611,7 +611,7 @@ Every one of these landed on hardware I don't own, on a bug I hadn't hit. Thank 
 | [@tripathiprateek](https://github.com/tripathiprateek) | `uninstall.sh` — reverses `setup.sh` cleanly ([#23](https://github.com/nicedreamzapp/claude-code-local/pull/23)) |
 | [@tadrianonet](https://github.com/tadrianonet) | Mac base/Pro 16 GB support: Qwen 2.5 14B, ChatML stop markers, `<tools>` parser, offline leak fix ([#32](https://github.com/nicedreamzapp/claude-code-local/pull/32)) |
 | [@kevbarns](https://github.com/kevbarns) | Gemma 4 thinking suppression + slimmer tool descriptions — ~4× latency cut ([#33](https://github.com/nicedreamzapp/claude-code-local/pull/33)) |
-| [@KaoCSC](https://github.com/KaoCSC) | Stop on the tokenizer's real EOS, and tolerate empty env ints ([#41](https://github.com/nicedreamzapp/claude-code-local/pull/41)) |
+| [@KaoCSC](https://github.com/KaoCSC) | Stop on the tokenizer's real EOS, and tolerate empty env ints ([#41](https://github.com/nicedreamzapp/claude-code-local/pull/41)) · bare JSON tool calls, which took Qwen 2.5 Coder from 0/12 to 14/14 ([#43](https://github.com/nicedreamzapp/claude-code-local/pull/43)) |
 
 Tested on **Apple M5 Max** with **128 GB unified memory**.
 
