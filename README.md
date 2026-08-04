@@ -586,6 +586,20 @@ Built on the shoulders of giants:
 | 🔧 [huihui-ai](https://huggingface.co/huihui-ai) + [Babsie](https://huggingface.co/Babsie) | Abliterations we build on | — |
 | 📖 [Abliteration explained](https://huggingface.co/blog/mlabonne/abliteration) | The technique | Maxime Labonne |
 
+### 🧑‍🔧 Contributors
+
+Every one of these landed on hardware I don't own, on a bug I hadn't hit. Thank you.
+
+| Who | What they fixed |
+|---|---|
+| [@0xshugo](https://github.com/0xshugo) | Client disconnects handled, retries skipped when there are no tools ([#4](https://github.com/nicedreamzapp/claude-code-local/pull/4)) |
+| [@asdmoment](https://github.com/asdmoment) | Gemma inference crash — auto-disable KV quantization ([#7](https://github.com/nicedreamzapp/claude-code-local/pull/7)) |
+| [@kulveersingh](https://github.com/kulveersingh) | `ArraysCache` has no attribute `offset` ([#10](https://github.com/nicedreamzapp/claude-code-local/pull/10)) |
+| [@tripathiprateek](https://github.com/tripathiprateek) | `uninstall.sh` — reverses `setup.sh` cleanly ([#23](https://github.com/nicedreamzapp/claude-code-local/pull/23)) |
+| [@tadrianonet](https://github.com/tadrianonet) | Mac base/Pro 16 GB support: Qwen 2.5 14B, ChatML stop markers, `<tools>` parser, offline leak fix ([#32](https://github.com/nicedreamzapp/claude-code-local/pull/32)) |
+| [@kevbarns](https://github.com/kevbarns) | Gemma 4 thinking suppression + slimmer tool descriptions — ~4× latency cut ([#33](https://github.com/nicedreamzapp/claude-code-local/pull/33)) |
+| [@KaoCSC](https://github.com/KaoCSC) | Stop on the tokenizer's real EOS, and tolerate empty env ints ([#41](https://github.com/nicedreamzapp/claude-code-local/pull/41)) |
+
 Tested on **Apple M5 Max** with **128 GB unified memory**.
 
 Built by [Matt Macosko](https://x.com/NiceDreamzApps) in Arcata, CA — part of [Nice Dreamz LLC](https://nicedreamzwholesale.com). More open-source at [nicedreamzwholesale.com/software](https://nicedreamzwholesale.com/software/) · demos at [youtube.com/@nicedreamzapps](https://www.youtube.com/@nicedreamzapps).
