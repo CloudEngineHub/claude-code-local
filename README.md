@@ -553,9 +553,9 @@ You don't have to be at your Mac to use this. Text a command, get back a full vi
 
 ---
 
-## 📱 Apps Shipped On This Stack
+## 📱 Apps From The Same Workshop
 
-Not a demo. Four apps built start to finish with this setup — Claude Code driving local models on Apple Silicon — and **all four are live on the App Store and Google Play**. No cloud coding assistant touched them.
+Same one-person shop, shipped to phones. No subscriptions, no accounts, nothing tracked — and **all four are live on the App Store and Google Play**.
 
 | App | What it does | Get it |
 |---|---|---|
