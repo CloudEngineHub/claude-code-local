@@ -450,6 +450,22 @@ Everything above gets you running. These live in [`docs/`](docs/) so this page s
 
 ---
 
+## 🔬 More Local-AI Work
+
+Not part of this stack — separate projects, same rule: **the model runs on your machine, not on somebody's server.**
+
+| Repo | What it is |
+|---|---|
+| 🧠 [nemotron-omni-mlx](https://github.com/nicedreamzapp/nemotron-omni-mlx) | NVIDIA's tri-modal **Nemotron Omni** — text, vision *and* audio — in pure MLX. The vision and audio towers had no Apple Silicon runtime, so I wrote one. **23/23 parity tests** against NVIDIA's PyTorch reference. 67 tok/s with an image, wifi off. |
+| 🎬 [story-forge](https://github.com/nicedreamzapp/story-forge) | A script goes in, a finished film comes out — stills, motion, voices, music, grade and sound, start to finish on one laptop. Flux · LTX-2 · Piper · ACE-Step · ffmpeg. |
+| 🎙️ [song-forge](https://github.com/nicedreamzapp/song-forge) | Describe a song, get a finished original in any of 19 languages. ACE-Step + Gemma + seed-vc voice swap, rendered locally, never stored. |
+| 👁️ [VisionBuilder](https://github.com/nicedreamzapp/VisionBuilder) | Label photos and train your own on-device vision model straight from the camera roll. The dataset never leaves the phone. |
+| 🗓️ [Family-Planner](https://github.com/nicedreamzapp/Family-Planner) | Self-hosted family command center for a spare iPad — voice control, OCR document scanning, meal planning. No cloud, no subscription. |
+
+📱 There are four apps on the App Store and Google Play too — [see them here](docs/OTHER-APPS.md).
+
+---
+
 ## 🛣️ What's Next
 
 We ship fast and in public. If any of these excite you, hit **Watch** to get the release ping.
