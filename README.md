@@ -119,7 +119,7 @@ We started with one model. Now we ship a **roster** — and it's a **living line
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 | Nickname | **The One That Runs On Your Laptop** | The Quick One | The Fresh Agent | The Wise One | The Beast | The 1M-Context Whale |
 | Build | 4-bit abliterated | 4-bit IT abliterated | 8-bit abliterated (in-house) | 8-bit abliterated | 4-bit MoE (A10B) | 2-bit asymmetric (ds4 GGUF) |
-| Speed | not benchmarked yet | ~15 tok/s | not benchmarked yet | ~7 tok/s | **65 tok/s** 🚀 | ~32 tok/s |
+| Speed | not benchmarked yet | ~15 tok/s | **~18 tok/s** | ~7 tok/s | **65 tok/s** 🚀 | ~32 tok/s |
 | Params | 14 B dense (Qwen3 base) | 31 B dense | ~30 B | 71 B dense | 122 B / 10 B active | **284 B / 37 B active** |
 | Context | 40 K | 128 K | 128 K | 128 K | 256 K | **1 M tokens** |
 | RAM | ~8 GB | ~18 GB | ~30 GB | ~70 GB | ~75 GB | ~81 GB |
@@ -128,7 +128,7 @@ We started with one model. Now we ship a **roster** — and it's a **living line
 | Engine | MLX Native | MLX Native | MLX Native | MLX Native | MLX Native | [`antirez/ds4`](https://github.com/antirez/ds4) |
 | Launcher | `Claude Local.command` | `Gemma 4 Code.command` | *coming* | `Llama 70B.command` | `Claude Local.command` | `DeepSeek V4 Flash.app` |
 
-> 🧪 **Muse-Glimmer just landed (Aug 2026)** — Meta's new agentic 30B, [abliterated in-house](#-our-own-mlx-abliterated-uploads) (our first self-abliteration). It's in the roster but **not yet benchmarked in this harness** — that's the living-repo deal: it goes in the day it drops, the tok/s and coding numbers land as we test it.
+> 🧪 **Muse-Glimmer just landed (Aug 2026)** — Meta's new agentic 30B, [abliterated in-house](#-our-own-mlx-abliterated-uploads) (our first self-abliteration). Decode speed is now measured — **~18 tok/s** on an M-series Max, 8-bit (a touch quicker than Gemma 4 31B). The full Claude Code task-time run is next. That's the living-repo deal: it goes in the day it drops, the numbers land as we test it.
 
 > 💻 **Got a 16 GB MacBook Air?** Start with Hermes. `setup.sh` picks it for you automatically — you don't need 96 GB of RAM to use this.
 
