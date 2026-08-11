@@ -1,12 +1,12 @@
 <p align="center">
   <h1 align="center">🧠⚡ Claude Code Local</h1>
   <p align="center">
-    <strong>Run Claude Code 100% on-device with local AI on Apple Silicon.<br>No cloud, no API key, no proxy — an MLX-native server that speaks the Anthropic API.<br>🥊 Pick your fighter: Gemma 4 31B · Llama 3.3 70B · Qwen 3.5 122B · DeepSeek V4 Flash (1M context via <a href="#-deepseek-v4-flash-via-ds4"><code>ds4</code></a>).</strong>
+    <strong>Run Claude Code 100% on-device with local AI on Apple Silicon.<br>No cloud, no API key, no proxy — an MLX-native server that speaks the Anthropic API.<br>🥊 Pick your fighter: Hermes 4 14B · Gemma 4 31B · Muse-Glimmer 30B · Llama 3.3 70B · Qwen 3.5 122B · DeepSeek V4 Flash (1M context via <a href="#-deepseek-v4-flash-via-ds4"><code>ds4</code></a>).</strong>
   </p>
   <p align="center">
     <a href="https://github.com/nicedreamzapp/claude-code-local/stargazers"><img src="https://img.shields.io/github/stars/nicedreamzapp/claude-code-local?style=for-the-badge&logo=github&color=f5c542&labelColor=1f2328" alt="GitHub stars"></a>
     <a href="https://github.com/nicedreamzapp/claude-code-local/network/members"><img src="https://img.shields.io/github/forks/nicedreamzapp/claude-code-local?style=for-the-badge&logo=github&color=4c9a2a&labelColor=1f2328" alt="GitHub forks"></a>
-    <a href="#-the-lineup--pick-your-fighter"><img src="https://img.shields.io/badge/🥊_Lineup-5_Models-red?style=for-the-badge" alt="5 Models"></a>
+    <a href="#-the-lineup--pick-your-fighter"><img src="https://img.shields.io/badge/🥊_Lineup-6_Models-red?style=for-the-badge" alt="6 Models"></a>
     <a href="#-benchmarks"><img src="https://img.shields.io/badge/⚡_Qwen_3.5-65_tok%2Fs-brightgreen?style=for-the-badge" alt="Qwen 3.5 speed"></a>
     <a href="#-benchmarks"><img src="https://img.shields.io/badge/🚀_Claude_Code_Task-17.6s-blue?style=for-the-badge" alt="Claude Code task time"></a>
     <a href="#-privacy--how-the-data-flows"><img src="https://img.shields.io/badge/🔒_Privacy-100%25_Local-success?style=for-the-badge" alt="100% Local"></a>
@@ -68,7 +68,7 @@ Your Mac has a powerful GPU built right into the chip. This project uses that GP
           │  HTTP localhost:4000
      ⚡ MLX Native Server      ← this repo (~1000 lines of Python)
           │
-     🥊 Pick your fighter     ← Gemma 4 31B · Llama 3.3 70B · Qwen 3.5 122B
+     🥊 Pick your fighter     ← Hermes · Gemma · Muse-Glimmer · Llama 3.3 · Qwen · DeepSeek
           │
      🖥️  Apple Silicon GPU    ← your M-series chip does all the work
 ```
@@ -113,20 +113,22 @@ Your Mac has a powerful GPU built right into the chip. This project uses that GP
 
 ## 🥊 The Lineup — Pick Your Fighter
 
-We started with one model. Now we ship a **roster**. Same MLX server, same Anthropic API — swap one env var and you swap the brain. Plus the `ds4` engine for DeepSeek V4 Flash via its own native Metal runtime.
+We started with one model. Now we ship a **roster** — and it's a **living lineup**: we're builders, this repo is always testing and updating, and new fighters get added the day they drop and benchmarked as we run them. Same MLX server, same Anthropic API — swap one env var and you swap the brain. Plus the `ds4` engine for DeepSeek V4 Flash via its own native Metal runtime.
 
-| | 🟡 **Hermes 4 14B** | 🟢 **Gemma 4 31B** | 🟠 **Llama 3.3 70B** | 🔵 **Qwen 3.5 122B** | 🐳 **DeepSeek V4 Flash** ⭐ |
-|---|:---:|:---:|:---:|:---:|:---:|
-| Nickname | **The One That Runs On Your Laptop** | The Quick One | The Wise One | The Beast | The 1M-Context Whale |
-| Build | 4-bit abliterated | 4-bit IT abliterated | 8-bit abliterated | 4-bit MoE (A10B) | 2-bit asymmetric (ds4 GGUF) |
-| Speed | not benchmarked yet | ~15 tok/s | ~7 tok/s | **65 tok/s** 🚀 | ~32 tok/s |
-| Params | 14 B dense (Qwen3 base) | 31 B dense | 71 B dense | 122 B / 10 B active | **284 B / 37 B active** |
-| Context | 40 K | 128 K | 128 K | 256 K | **1 M tokens** |
-| RAM | ~8 GB | ~18 GB | ~70 GB | ~75 GB | ~81 GB |
-| Min RAM to run | **16 GB** | 32 GB | 96 GB | 96 GB | 128 GB |
-| Best at | Everyday edits on a stock MacBook | Daily coding | Hardest reasoning, full precision | Max throughput, active sparsity | Long context, agentic loops |
-| Engine | MLX Native | MLX Native | MLX Native | MLX Native | [`antirez/ds4`](https://github.com/antirez/ds4) |
-| Launcher | `Claude Local.command` | `Gemma 4 Code.command` | `Llama 70B.command` | `Claude Local.command` | `DeepSeek V4 Flash.app` |
+| | 🟡 **Hermes 4 14B** | 🟢 **Gemma 4 31B** | ✨ **Muse-Glimmer 30B** | 🟠 **Llama 3.3 70B** | 🔵 **Qwen 3.5 122B** | 🐳 **DeepSeek V4 Flash** ⭐ |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| Nickname | **The One That Runs On Your Laptop** | The Quick One | The Fresh Agent | The Wise One | The Beast | The 1M-Context Whale |
+| Build | 4-bit abliterated | 4-bit IT abliterated | 8-bit abliterated (in-house) | 8-bit abliterated | 4-bit MoE (A10B) | 2-bit asymmetric (ds4 GGUF) |
+| Speed | not benchmarked yet | ~15 tok/s | not benchmarked yet | ~7 tok/s | **65 tok/s** 🚀 | ~32 tok/s |
+| Params | 14 B dense (Qwen3 base) | 31 B dense | ~30 B | 71 B dense | 122 B / 10 B active | **284 B / 37 B active** |
+| Context | 40 K | 128 K | 128 K | 128 K | 256 K | **1 M tokens** |
+| RAM | ~8 GB | ~18 GB | ~30 GB | ~70 GB | ~75 GB | ~81 GB |
+| Min RAM to run | **16 GB** | 32 GB | 48 GB | 96 GB | 96 GB | 128 GB |
+| Best at | Everyday edits on a stock MacBook | Daily coding | Agentic loops + tool use, uncensored | Hardest reasoning, full precision | Max throughput, active sparsity | Long context, agentic loops |
+| Engine | MLX Native | MLX Native | MLX Native | MLX Native | MLX Native | [`antirez/ds4`](https://github.com/antirez/ds4) |
+| Launcher | `Claude Local.command` | `Gemma 4 Code.command` | *coming* | `Llama 70B.command` | `Claude Local.command` | `DeepSeek V4 Flash.app` |
+
+> 🧪 **Muse-Glimmer just landed (Aug 2026)** — Meta's new agentic 30B, [abliterated in-house](#-our-own-mlx-abliterated-uploads) (our first self-abliteration). It's in the roster but **not yet benchmarked in this harness** — that's the living-repo deal: it goes in the day it drops, the tok/s and coding numbers land as we test it.
 
 > 💻 **Got a 16 GB MacBook Air?** Start with Hermes. `setup.sh` picks it for you automatically — you don't need 96 GB of RAM to use this.
 
