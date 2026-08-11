@@ -161,6 +161,10 @@ MLX_MODEL=divinetribe/gemma-4-31b-it-abliterated-4bit-mlx \
 # Hermes 4 14B — sweet spot for 16/32 GB Macs
 MLX_MODEL=divinetribe/Hermes-4-14B-abliterated-4bit-mlx \
   bash scripts/start-mlx-server.sh
+
+# Muse-Glimmer 30B — Meta's new agentic model, abliterated in-house
+MLX_MODEL=divinetribe/Muse-Glimmer-30B-Abliterated-8bit \
+  bash scripts/start-mlx-server.sh
 ```
 
 | Model | Quant | Disk | Params | Context | Best for |
@@ -168,10 +172,12 @@ MLX_MODEL=divinetribe/Hermes-4-14B-abliterated-4bit-mlx \
 | [`Llama-3.3-70B-Instruct-abliterated-8bit-mlx`](https://huggingface.co/divinetribe/Llama-3.3-70B-Instruct-abliterated-8bit-mlx) | 8-bit, g64 | ~75 GB | 71 B dense | 128 K | Hardest reasoning on 96 GB+ Macs |
 | [`gemma-4-31b-it-abliterated-4bit-mlx`](https://huggingface.co/divinetribe/gemma-4-31b-it-abliterated-4bit-mlx) | 4-bit, g64 | ~17 GB | 31 B dense | 128 K | Daily coding on a 32 GB+ Mac |
 | [`Hermes-4-14B-abliterated-4bit-mlx`](https://huggingface.co/divinetribe/Hermes-4-14B-abliterated-4bit-mlx) | 4-bit, g64 | ~8 GB | 14 B dense (Qwen3 base) | 40 K | 16 GB Macs, instruction-following, tool use |
+| [`Muse-Glimmer-30B-Abliterated-8bit`](https://huggingface.co/divinetribe/Muse-Glimmer-30B-Abliterated-8bit) | 8-bit, g64 | ~30 GB | ~30 B | 128 K | General + agentic chat on 32 GB+ Macs |
+| [`Muse-Glimmer-30B-Abliterated-bf16`](https://huggingface.co/divinetribe/Muse-Glimmer-30B-Abliterated-bf16) | bf16 | ~52 GB | ~30 B | 128 K | Full precision / re-quantizing, 64 GB+ Macs |
 
-**Abliteration sources:** [huihui-ai](https://huggingface.co/huihui-ai) (Llama, Gemma) and [Babsie](https://huggingface.co/Babsie) (Hermes). MLX conversion + quantization by us. See [what abliteration means](https://huggingface.co/blog/mlabonne/abliteration).
+**Abliteration sources:** [huihui-ai](https://huggingface.co/huihui-ai) (Llama, Gemma) and [Babsie](https://huggingface.co/Babsie) (Hermes). **Muse-Glimmer we abliterated ourselves** — refusal direction removed at layer 26 across every residual-writing layer, on Meta's freshly-released Muse-Glimmer-30B (vision tower dropped, text-only). MLX conversion + quantization by us. See [what abliteration means](https://huggingface.co/blog/mlabonne/abliteration).
 
-> ⚠️ **Use it responsibly.** "Abliterated" suppresses the model's built-in refusal direction so it doesn't refuse benign-but-edgy requests. It is **not** a general capability upgrade, and you remain bound by each upstream license (Llama 3.3, Gemma, Hermes/Qwen3).
+> ⚠️ **Use it responsibly.** "Abliterated" suppresses the model's built-in refusal direction so it doesn't refuse benign-but-edgy requests. It is **not** a general capability upgrade, and you remain bound by each upstream license (Llama 3.3, Gemma, Hermes/Qwen3, Muse-Glimmer).
 
 ---
 
