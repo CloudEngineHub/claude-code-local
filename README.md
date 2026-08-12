@@ -124,11 +124,13 @@ We started with one model. Now we ship a **roster** — and it's a **living line
 | Context | 40 K | 128 K | 128 K | 128 K | 256 K | **1 M tokens** |
 | RAM | ~8 GB | ~18 GB | ~30 GB | ~70 GB | ~75 GB | ~81 GB |
 | Min RAM to run | **16 GB** | 32 GB | 48 GB | 96 GB | 96 GB | 128 GB |
-| Best at | Everyday edits on a stock MacBook | Daily coding | Agentic loops + tool use, uncensored | Hardest reasoning, full precision | Max throughput, active sparsity | Long context, agentic loops |
+| Best at | Everyday edits on a stock MacBook | Daily coding | Vision + agentic tool use, uncensored | Hardest reasoning, full precision | Max throughput, active sparsity | Long context, agentic loops |
 | Engine | MLX Native | MLX Native | MLX Native | MLX Native | MLX Native | [`antirez/ds4`](https://github.com/antirez/ds4) |
 | Launcher | `Claude Local.command` | `Gemma 4 Code.command` | *coming* | `Llama 70B.command` | `Claude Local.command` | `DeepSeek V4 Flash.app` |
 
-> 🧪 **Muse-Glimmer just landed (Aug 2026)** — Meta's new agentic 30B, [abliterated in-house](#-our-own-mlx-abliterated-uploads) (our first self-abliteration). Decode speed is now measured — **~18 tok/s** on an M-series Max, 8-bit (a touch quicker than Gemma 4 31B). The full Claude Code task-time run is next. That's the living-repo deal: it goes in the day it drops, the numbers land as we test it.
+> 🧪 **Muse-Glimmer just landed (Aug 2026)** — Meta's new agentic 30B, [abliterated in-house](#-our-own-mlx-abliterated-uploads) (our first self-abliteration). Decode speed is measured — **~18 tok/s** on an M-series Max, 8-bit (a touch quicker than Gemma 4 31B).
+>
+> 👁️ **Now with vision.** The new [`-MM-bf16`](https://huggingface.co/divinetribe/Muse-Glimmer-30B-Abliterated-MM-bf16) build keeps the full vision tower, so the same abliterated model *reads images* — verified describing photos and scenes on MLX. We believe it's the **first abliterated multimodal model running on Apple Silicon**. It runs through our own [`mlx-vlm-muse-glimmer`](https://github.com/nicedreamzapp/mlx-vlm-muse-glimmer) model class. That's the living-repo deal: it goes in the day it drops, the numbers land as we test it.
 
 > 💻 **Got a 16 GB MacBook Air?** Start with Hermes. `setup.sh` picks it for you automatically — you don't need 96 GB of RAM to use this.
 
@@ -176,8 +178,9 @@ MLX_MODEL=divinetribe/Muse-Glimmer-30B-Abliterated-8bit \
 | [`Hermes-4-14B-abliterated-4bit-mlx`](https://huggingface.co/divinetribe/Hermes-4-14B-abliterated-4bit-mlx) | 4-bit, g64 | ~8 GB | 14 B dense (Qwen3 base) | 40 K | 16 GB Macs, instruction-following, tool use |
 | [`Muse-Glimmer-30B-Abliterated-8bit`](https://huggingface.co/divinetribe/Muse-Glimmer-30B-Abliterated-8bit) | 8-bit, g64 | ~30 GB | ~30 B | 128 K | General + agentic chat on 32 GB+ Macs |
 | [`Muse-Glimmer-30B-Abliterated-bf16`](https://huggingface.co/divinetribe/Muse-Glimmer-30B-Abliterated-bf16) | bf16 | ~52 GB | ~30 B | 128 K | Full precision / re-quantizing, 64 GB+ Macs |
+| [`Muse-Glimmer-30B-Abliterated-MM-bf16`](https://huggingface.co/divinetribe/Muse-Glimmer-30B-Abliterated-MM-bf16) 👁️ | bf16 | ~60 GB | ~30 B | 128 K | **Vision + text** (multimodal), 128 GB Macs |
 
-**Abliteration sources:** [huihui-ai](https://huggingface.co/huihui-ai) (Llama, Gemma) and [Babsie](https://huggingface.co/Babsie) (Hermes). **Muse-Glimmer we abliterated ourselves** — refusal direction removed at layer 26 across every residual-writing layer, on Meta's freshly-released Muse-Glimmer-30B (vision tower dropped, text-only). MLX conversion + quantization by us. See [what abliteration means](https://huggingface.co/blog/mlabonne/abliteration).
+**Abliteration sources:** [huihui-ai](https://huggingface.co/huihui-ai) (Llama, Gemma) and [Babsie](https://huggingface.co/Babsie) (Hermes). **Muse-Glimmer we abliterated ourselves** — refusal direction removed at layer 26 across every residual-writing layer, on Meta's freshly-released Muse-Glimmer-30B. The `-8bit`/`-bf16` builds are text-only; the new **[`-MM-bf16`](https://huggingface.co/divinetribe/Muse-Glimmer-30B-Abliterated-MM-bf16) restores the full vision tower** (1,436 tensors) so it reads images *and* stays abliterated — believed the first abliterated multimodal model running on Apple MLX. Vision runs via our [`mlx-vlm-muse-glimmer`](https://github.com/nicedreamzapp/mlx-vlm-muse-glimmer) model class. MLX conversion + quantization by us. See [what abliteration means](https://huggingface.co/blog/mlabonne/abliteration).
 
 > ⚠️ **Use it responsibly.** "Abliterated" suppresses the model's built-in refusal direction so it doesn't refuse benign-but-edgy requests. It is **not** a general capability upgrade, and you remain bound by each upstream license (Llama 3.3, Gemma, Hermes/Qwen3, Muse-Glimmer).
 
