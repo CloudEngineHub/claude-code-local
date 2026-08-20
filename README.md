@@ -115,19 +115,21 @@ Your Mac has a powerful GPU built right into the chip. This project uses that GP
 
 We started with one model. Now we ship a **roster** — and it's a **living lineup**: we're builders, this repo is always testing and updating, and new fighters get added the day they drop and benchmarked as we run them. Same MLX server, same Anthropic API — swap one env var and you swap the brain. Plus the `ds4` engine for DeepSeek V4 Flash via its own native Metal runtime.
 
-| | 🟡 **Hermes 4 14B** | 🟢 **Gemma 4 31B** | ✨ **Muse-Glimmer 30B** | 🟠 **Llama 3.3 70B** | 🔵 **Qwen 3.5 122B** | 🐳 **DeepSeek V4 Flash** ⭐ |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| Nickname | **The One That Runs On Your Laptop** | The Quick One | The Fresh Agent | The Wise One | The Beast | The 1M-Context Whale |
-| Build | 4-bit abliterated | 4-bit IT abliterated | 8-bit abliterated (in-house) | 8-bit abliterated | 4-bit MoE (A10B) | 2-bit asymmetric (ds4 GGUF) |
-| Speed | not benchmarked yet | ~15 tok/s | **~18 tok/s** | ~7 tok/s | **65 tok/s** 🚀 | ~32 tok/s |
-| Params | 14 B dense (Qwen3 base) | 31 B dense | ~30 B | 71 B dense | 122 B / 10 B active | **284 B / 37 B active** |
-| Context | 40 K | 128 K | 128 K | 128 K | 256 K | **1 M tokens** |
-| RAM | ~8 GB | ~18 GB | ~30 GB | ~70 GB | ~75 GB | ~81 GB |
-| Min RAM to run | **16 GB** | 32 GB | 48 GB | 96 GB | 96 GB | 128 GB |
-| Best at | Everyday edits on a stock MacBook | Daily coding | Vision + agentic tool use, uncensored | Hardest reasoning, full precision | Max throughput, active sparsity | Long context, agentic loops |
-| Engine | MLX Native | MLX Native | MLX Native | MLX Native | MLX Native | [`antirez/ds4`](https://github.com/antirez/ds4) |
-| Launcher | `Claude Local.command` | `Gemma 4 Code.command` | *coming* | `Llama 70B.command` | `Claude Local.command` | `DeepSeek V4 Flash.app` |
+| | 🟡 **Hermes 4 14B** | 🟢 **Gemma 4 31B** | ✨ **Muse-Glimmer 30B** | 🟣 **Qwen 3.8 27B** 🆕 | 🟠 **Llama 3.3 70B** | 🔵 **Qwen 3.5 122B** | 🐳 **DeepSeek V4 Flash** ⭐ |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Nickname | **The One That Runs On Your Laptop** | The Quick One | The Fresh Agent | **The Full-Precision Sprinter** | The Wise One | The Beast | The 1M-Context Whale |
+| Build | 4-bit abliterated | 4-bit IT abliterated | 8-bit abliterated (in-house) | **bf16, nothing quantized** + DFlash 2 drafter | 8-bit abliterated | 4-bit MoE (A10B) | 2-bit asymmetric (ds4 GGUF) |
+| Speed | not benchmarked yet | ~15 tok/s | **~18 tok/s** | **36.5 tok/s** (9.7 without the drafter) | ~7 tok/s | **65 tok/s** 🚀 | ~32 tok/s |
+| Params | 14 B dense (Qwen3 base) | 31 B dense | ~30 B | 27 B dense | 71 B dense | 122 B / 10 B active | **284 B / 37 B active** |
+| Context | 40 K | 128 K | 128 K | **262 K** | 128 K | 256 K | **1 M tokens** |
+| RAM | ~8 GB | ~18 GB | ~30 GB | ~59 GB (55 weights + 4 drafter) | ~70 GB | ~75 GB | ~81 GB |
+| Min RAM to run | **16 GB** | 32 GB | 48 GB | 96 GB | 96 GB | 96 GB | 128 GB |
+| Best at | Everyday edits on a stock MacBook | Daily coding | Vision + agentic tool use, uncensored | Full-precision coding + vision at quantized speed | Hardest reasoning, full precision | Max throughput, active sparsity | Long context, agentic loops |
+| Engine | MLX Native | MLX Native | MLX Native | [`mlx-dspark`](https://github.com/ARahim3/mlx-dspark) (MLX + DFlash 2) | MLX Native | MLX Native | [`antirez/ds4`](https://github.com/antirez/ds4) |
+| Launcher | `Claude Local.command` | `Gemma 4 Code.command` | *coming* | *coming* | `Llama 70B.command` | `Claude Local.command` | `DeepSeek V4 Flash.app` |
 
+> 🟣 **Qwen 3.8 27B just landed (Aug 20, 2026) — and we run it at full bf16.** Alibaba's new 27B dense model (Apache 2.0, native image + video input, 262K context) is the first small model we'd put next to the cloud ones, so we refused to quantize it. The trick that makes bf16 livable is **[DFlash 2](https://inco.ai/blog/dflash2/)**, a speculative-decoding drafter from Inco AI / Z Lab: a 2B draft model proposes a block of tokens, the 27B verifies the block in one pass, and the output is **byte-identical** to plain decoding. Measured on our M5 Max 128 GB, same prompt, 600 tokens, greedy: **9.7 tok/s plain → 36.5 tok/s with DFlash 2** (3.8×, 4.4 accepted tokens per round). Weights: [`mlx-community/Qwen3.8-27B-bf16`](https://huggingface.co/mlx-community/Qwen3.8-27B-bf16) (54.7 GB) + drafter [`incoai/Qwen3.8-27B-DFlash2`](https://huggingface.co/incoai/Qwen3.8-27B-DFlash2) (3.8 GB), served by [`mlx-dspark`](https://github.com/ARahim3/mlx-dspark) (`pip install mlx-dspark`, OpenAI-compatible API). Two tips that survived a night of testing: keep the draft block at 5 on Metal (4/6/7/10 were all slower for us and for others), and drop the community **[Sharp chat template](https://huggingface.co/peculiar-ragdoll/Qwen-Sharp-Chat-Templates)** into the model folder — it fixes the stock template's empty-think aborts, defaults reasoning to `medium` instead of `xhigh`, and makes the model lead with the answer. Vision works through `mlx-vlm` (no drafter on that path yet). Claude Code launcher is next on the list.
+>
 > 🧪 **Muse-Glimmer just landed (Aug 2026)** — Meta's new agentic 30B, [abliterated in-house](#-our-own-mlx-abliterated-uploads) (our first self-abliteration). Decode speed is measured — **~18 tok/s** on an M-series Max, 8-bit (a touch quicker than Gemma 4 31B).
 >
 > 👁️ **Now with vision.** The new [`-MM-bf16`](https://huggingface.co/divinetribe/Muse-Glimmer-30B-Abliterated-MM-bf16) build keeps the full vision tower, so the same abliterated model *reads images* — recognition, fine-grained ID, landmarks, in-the-wild OCR, and chart reading, all on-device. We believe it's the **first abliterated multimodal model running on Apple Silicon**. It runs through our own [`mlx-vlm-muse-glimmer`](https://github.com/nicedreamzapp/mlx-vlm-muse-glimmer) model class. **[▶ Watch the vision demo](https://www.youtube.com/watch?v=5fs_FfkCaDA)** — it names the exact Jaguar F-Type from the spoiler with the badge blurred, places the Taj Mahal, reads a neon sign, and pulls a value off a bar chart. That's the living-repo deal: it goes in the day it drops, the numbers land as we test it.
@@ -171,18 +173,37 @@ MLX_MODEL=divinetribe/Muse-Glimmer-30B-Abliterated-8bit \
   bash scripts/start-mlx-server.sh
 ```
 
+Every public model on [huggingface.co/divinetribe](https://huggingface.co/divinetribe), as of Aug 20, 2026. Sizes are the real on-disk totals from the Hub. All are MLX-format; the 👁️ ones take images.
+
+**Text models**
+
 | Model | Quant | Disk | Params | Context | Best for |
 |---|---|---|---|---|---|
-| [`Llama-3.3-70B-Instruct-abliterated-8bit-mlx`](https://huggingface.co/divinetribe/Llama-3.3-70B-Instruct-abliterated-8bit-mlx) | 8-bit, g64 | ~75 GB | 71 B dense | 128 K | Hardest reasoning on 96 GB+ Macs |
-| [`gemma-4-31b-it-abliterated-4bit-mlx`](https://huggingface.co/divinetribe/gemma-4-31b-it-abliterated-4bit-mlx) | 4-bit, g64 | ~17 GB | 31 B dense | 128 K | Daily coding on a 32 GB+ Mac |
-| [`Hermes-4-14B-abliterated-4bit-mlx`](https://huggingface.co/divinetribe/Hermes-4-14B-abliterated-4bit-mlx) | 4-bit, g64 | ~8 GB | 14 B dense (Qwen3 base) | 40 K | 16 GB Macs, instruction-following, tool use |
-| [`Muse-Glimmer-30B-Abliterated-8bit`](https://huggingface.co/divinetribe/Muse-Glimmer-30B-Abliterated-8bit) | 8-bit, g64 | ~30 GB | ~30 B | 128 K | General + agentic chat on 32 GB+ Macs |
-| [`Muse-Glimmer-30B-Abliterated-bf16`](https://huggingface.co/divinetribe/Muse-Glimmer-30B-Abliterated-bf16) | bf16 | ~52 GB | ~30 B | 128 K | Full precision / re-quantizing, 64 GB+ Macs |
-| [`Muse-Glimmer-30B-Abliterated-MM-bf16`](https://huggingface.co/divinetribe/Muse-Glimmer-30B-Abliterated-MM-bf16) 👁️ | bf16 | ~60 GB | ~30 B | 128 K | **Vision + text** (multimodal), 128 GB Macs |
+| [`Llama-3.3-70B-Instruct-abliterated-8bit-mlx`](https://huggingface.co/divinetribe/Llama-3.3-70B-Instruct-abliterated-8bit-mlx) | 8-bit, g64 | 75.0 GB | 71 B dense | 128 K | Hardest reasoning on 96 GB+ Macs |
+| [`Huihui-Qwen3-Coder-Next-Opus-4.6-Reasoning-Distilled-abliterated-4bit-mlx`](https://huggingface.co/divinetribe/Huihui-Qwen3-Coder-Next-Opus-4.6-Reasoning-Distilled-abliterated-4bit-mlx) | 4-bit | 44.9 GB | Qwen3-Coder-Next MoE | — | Coding agent distilled from Opus 4.6 reasoning traces, 64 GB+ Macs |
+| [`gemma-4-31b-it-abliterated-4bit-mlx`](https://huggingface.co/divinetribe/gemma-4-31b-it-abliterated-4bit-mlx) | 4-bit, g64 | 17.3 GB | 31 B dense | 128 K | Daily coding on a 32 GB+ Mac (the default fighter) |
+| [`Huihui-gemma-4-31B-it-abliterated-4bit-mlx`](https://huggingface.co/divinetribe/Huihui-gemma-4-31B-it-abliterated-4bit-mlx) | 4-bit, g64 | 17.3 GB | 31 B dense | 128 K | Same model, huihui-ai's abliteration instead of null-space's |
+| [`Qwen3.6-27B-abliterated-4bit-mlx`](https://huggingface.co/divinetribe/Qwen3.6-27B-abliterated-4bit-mlx) | 4-bit | 15.2 GB | 27 B dense | 256 K | Qwen 3.6 generation, 32 GB+ Macs |
+| [`gemma-4-12B-it-abliterated-4bit-mlx`](https://huggingface.co/divinetribe/gemma-4-12B-it-abliterated-4bit-mlx) | 4-bit | 11.0 GB | 12 B dense | 128 K | 32 GB Macs |
+| [`gemma-4-12B-it-abliterated-4bit-mlx-text`](https://huggingface.co/divinetribe/gemma-4-12B-it-abliterated-4bit-mlx-text) | 4-bit | 11.0 GB | 12 B dense | 128 K | Same, vision tower stripped — loads in plain `mlx-lm` |
+| [`Hermes-4-14B-abliterated-4bit-mlx`](https://huggingface.co/divinetribe/Hermes-4-14B-abliterated-4bit-mlx) | 4-bit, g64 | 8.3 GB | 14 B dense (Qwen3 base) | 40 K | 16 GB Macs, instruction-following, tool use |
+| [`Huihui-Qwen3-8B-abliterated-v2-4bit-mlx`](https://huggingface.co/divinetribe/Huihui-Qwen3-8B-abliterated-v2-4bit-mlx) | 4-bit | 4.6 GB | 8 B dense | 40 K | 8-16 GB Macs, the smallest thing here that still follows tools |
 
-**Abliteration sources:** [huihui-ai](https://huggingface.co/huihui-ai) (Llama, Gemma) and [Babsie](https://huggingface.co/Babsie) (Hermes). **Muse-Glimmer we abliterated ourselves** — refusal direction removed at layer 26 across every residual-writing layer, on Meta's freshly-released Muse-Glimmer-30B. The `-8bit`/`-bf16` builds are text-only; the new **[`-MM-bf16`](https://huggingface.co/divinetribe/Muse-Glimmer-30B-Abliterated-MM-bf16) restores the full vision tower** (1,436 tensors) so it reads images *and* stays abliterated — believed the first abliterated multimodal model running on Apple MLX. Vision runs via our [`mlx-vlm-muse-glimmer`](https://github.com/nicedreamzapp/mlx-vlm-muse-glimmer) model class. MLX conversion + quantization by us. See [what abliteration means](https://huggingface.co/blog/mlabonne/abliteration).
+**Vision + text models** 👁️
 
-> ⚠️ **Use it responsibly.** "Abliterated" suppresses the model's built-in refusal direction so it doesn't refuse benign-but-edgy requests. It is **not** a general capability upgrade, and you remain bound by each upstream license (Llama 3.3, Gemma, Hermes/Qwen3, Muse-Glimmer).
+| Model | Quant | Disk | Params | Context | Best for |
+|---|---|---|---|---|---|
+| [`Nemotron-3-Nano-Omni-30B-Abliterated-MM-bf16`](https://huggingface.co/divinetribe/Nemotron-3-Nano-Omni-30B-Abliterated-MM-bf16) 👁️🎧 | bf16 | 66.0 GB | 30 B / 3 B active MoE | 128 K | NVIDIA's tri-modal (text + vision + **audio**) Omni, full precision; runs via [`nemotron-omni-mlx`](https://github.com/nicedreamzapp/nemotron-omni-mlx) |
+| [`Nemotron-3-Nano-Omni-30B-Abliterated-MM-8bit`](https://huggingface.co/divinetribe/Nemotron-3-Nano-Omni-30B-Abliterated-MM-8bit) 👁️🎧 | 8-bit | 35.8 GB | 30 B / 3 B active MoE | 128 K | Same, 48 GB+ Macs |
+| [`Nemotron-3-Nano-Omni-30B-Abliterated-MM-4bit`](https://huggingface.co/divinetribe/Nemotron-3-Nano-Omni-30B-Abliterated-MM-4bit) 👁️🎧 | 4-bit | 19.7 GB | 30 B / 3 B active MoE | 128 K | Same, 32 GB Macs |
+| [`Muse-Glimmer-30B-Abliterated-MM-bf16`](https://huggingface.co/divinetribe/Muse-Glimmer-30B-Abliterated-MM-bf16) 👁️ | bf16 | 59.6 GB | ~30 B | 128 K | Meta's agentic 30B with the full vision tower, abliterated in-house; runs via [`mlx-vlm-muse-glimmer`](https://github.com/nicedreamzapp/mlx-vlm-muse-glimmer) |
+| [`Huihui-Qwen3-VL-32B-Instruct-abliterated-4bit-mlx`](https://huggingface.co/divinetribe/Huihui-Qwen3-VL-32B-Instruct-abliterated-4bit-mlx) 👁️ | 4-bit | 19.6 GB | 32 B dense | 256 K | Qwen3-VL vision-language, 32 GB+ Macs |
+
+Also on the Hub: [`yolov8n-oiv7-coreml`](https://huggingface.co/divinetribe/yolov8n-oiv7-coreml), the 601-class CoreML detector behind [RealTimeAICam](https://github.com/nicedreamzapp/RealTimeAICam).
+
+**Abliteration sources:** [huihui-ai](https://huggingface.co/huihui-ai) (Llama, Qwen, one of the Gemma 31Bs), [null-space](https://huggingface.co/null-space) (Gemma 4 31B), [OpenYourMind](https://huggingface.co/OpenYourMind) (Gemma 4 12B) and [Babsie](https://huggingface.co/Babsie) (Hermes). **Muse-Glimmer and Nemotron Omni we abliterated ourselves** — refusal direction removed across every residual-writing layer (layer 26 on Glimmer), on the freshly-released bf16 weights, with the vision (and for Nemotron, audio) towers kept intact. We believe Glimmer-MM was the first abliterated multimodal model running on Apple MLX. MLX conversion + quantization by us. See [what abliteration means](https://huggingface.co/blog/mlabonne/abliteration).
+
+> ⚠️ **Use it responsibly.** "Abliterated" suppresses the model's built-in refusal direction so it doesn't refuse benign-but-edgy requests. It is **not** a general capability upgrade, and you remain bound by each upstream license (Llama 3.3, Gemma, Hermes/Qwen3, Qwen3.6/VL, Muse-Glimmer, Nemotron).
 
 ---
 
@@ -207,7 +228,7 @@ Four ways to run the lineup. Each one is a double-clickable launcher in `launche
 | MacBook Air / base M1-M4 | **16 GB** | 🟡 **Hermes 4 14B** — yes, this works |
 | M1/M2/M3/M4 Pro | 32-48 GB | 🟢 Gemma 4 12B |
 | M2/M3/M4/M5 Max | 64-95 GB | 🟢 **Gemma 4 31B** |
-| M3/M4/M5 Max · Ultra | 96 GB+ | 🔵 Qwen 3.5 122B, 🟠 Llama 70B, 🐳 DeepSeek |
+| M3/M4/M5 Max · Ultra | 96 GB+ | 🟣 Qwen 3.8 27B bf16, 🔵 Qwen 3.5 122B, 🟠 Llama 70B, 🐳 DeepSeek |
 
 Also need:
 - 🐍 **Python 3.12+** (for MLX)
@@ -443,6 +464,7 @@ fix is what made the deeper rotating-cache problem visible. Thank you.
 | Model | tok/s | RAM | Best For |
 |---|:---:|:---:|---|
 | 🟢 Gemma 4 31B Abliterated | ~15 | ~18 GB | Daily coding on a 64 GB Mac |
+| 🟣 **Qwen 3.8 27B bf16 + DFlash 2** | **36.5** (9.7 plain) | ~59 GB | Full precision at quantized speed, 262 K context, vision |
 | 🟠 Llama 3.3 70B Abliterated | ~7 | ~70 GB | Hardest reasoning, full precision |
 | 🔵 **Qwen 3.5 122B-A10B** | **65** | ~75 GB | Maximum throughput, MoE sparsity |
 
@@ -542,6 +564,7 @@ Not part of this stack — separate projects, same rule: **the model runs on you
 
 We ship fast and in public. If any of these excite you, hit **Watch** to get the release ping.
 
+- 🟣 **Qwen 3.8 27B launcher** — wire the bf16 + DFlash 2 server into `Claude Local.command` and the tool-call translator (today it's served by `mlx-dspark` on its own port)
 - 🟡 **Full Qwen 3.5 122B benchmark suite** — reliability, tool-call pass rate, long-context behavior vs Gemma
 - 🟡 **Fully-local Whisper fallback** — alternative to the Apple `SFSpeechRecognizer` path for older Macs and non-English voices
 - 🟡 **One-click DMG installer** — no terminal needed

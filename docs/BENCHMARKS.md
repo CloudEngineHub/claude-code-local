@@ -29,6 +29,19 @@ The same MLX server runs all three. Just swap the `MLX_MODEL` env var.
 
 ---
 
+## Qwen 3.8 27B at bf16 — plain vs DFlash 2 (measured Aug 20, 2026)
+
+Same M5 Max 128 GB. Weights [`mlx-community/Qwen3.8-27B-bf16`](https://huggingface.co/mlx-community/Qwen3.8-27B-bf16) (54.7 GB, nothing quantized), drafter [`incoai/Qwen3.8-27B-DFlash2`](https://huggingface.co/incoai/Qwen3.8-27B-DFlash2) (3.8 GB), engine [`mlx-dspark`](https://github.com/ARahim3/mlx-dspark) 0.14 on MLX 0.32. One prompt ("write an ISO-8601 parser with tests, then explain edge cases"), 600 new tokens, temperature 0, nothing else on the GPU (Song Forge stopped for the run).
+
+| Mode | Tokens | Wall | tok/s | Notes |
+|---|:---:|:---:|:---:|---|
+| Plain decode (`--mode baseline`) | 600 | 62.1 s | **9.7** | bandwidth-bound: 55 GB of weights per token |
+| DFlash 2 (`--mode dflash`) | 603 | 16.5 s | **36.5** | 4.43 accepted tokens / round, 137 target forwards, output identical |
+
+That is a **3.8× speedup with zero precision loss**: the drafter only proposes, the bf16 model still decides every token. Through the OpenAI-style server (`mlx-dspark serve`) with the Sharp chat template and real thinking budgets we saw 26-36 tok/s on chat and coding prompts, including prompt processing. Block size 5 was fastest on Metal; 4, 6, 7 and 10 were all slower. For scale, 4-bit Qwen 3.8 + DFlash 2 on an M5 Max is widely reported at 50-70 tok/s — faster, but no longer the model Alibaba shipped.
+
+---
+
 ## Generation Speed (Qwen 3.5 122B — measured)
 
 | Max Tokens | Output Tokens | Time | **Tokens/sec** |
@@ -124,3 +137,4 @@ Generation speed is hardware-bound at ~13.5 tok/s on M4 Pro (memory bandwidth li
 - KV cache quantized via MLX's built-in `QuantizedKVCache`
 - Temperature: 0.2 for tool-call reliability runs, 0.7 for raw generation runs
 - Qwen 122B numbers are measured. Gemma 4 31B (~15 tok/s) and Llama 3.3 70B (~7 tok/s) are observed approximations from real-world Claude Code usage on the same M5 Max — full benchmarks pending.
+- Qwen 3.8 27B numbers (9.7 / 36.5 tok/s) are single measured runs via `mlx-dspark generate`, greedy, 600 tokens, reported by the engine itself; not yet measured end-to-end inside Claude Code.
