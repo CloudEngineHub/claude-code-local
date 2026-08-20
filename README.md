@@ -1,12 +1,12 @@
 <p align="center">
   <h1 align="center">🧠⚡ Claude Code Local</h1>
   <p align="center">
-    <strong>Run Claude Code 100% on-device with local AI on Apple Silicon.<br>No cloud, no API key, no proxy — an MLX-native server that speaks the Anthropic API.<br>🥊 Pick your fighter: Hermes 4 14B · Gemma 4 31B · Muse-Glimmer 30B · Llama 3.3 70B · Qwen 3.5 122B · DeepSeek V4 Flash (1M context via <a href="#-deepseek-v4-flash-via-ds4"><code>ds4</code></a>).</strong>
+    <strong>Run Claude Code 100% on-device with local AI on Apple Silicon.<br>No cloud, no API key, no proxy — an MLX-native server that speaks the Anthropic API.<br>🥊 Pick your fighter: Hermes 4 14B · Gemma 4 31B · Muse-Glimmer 30B · Qwen 3.8 27B bf16 · Llama 3.3 70B · Qwen 3.5 122B · DeepSeek V4 Flash (1M context via <a href="#-deepseek-v4-flash-via-ds4"><code>ds4</code></a>).</strong>
   </p>
   <p align="center">
     <a href="https://github.com/nicedreamzapp/claude-code-local/stargazers"><img src="https://img.shields.io/github/stars/nicedreamzapp/claude-code-local?style=for-the-badge&logo=github&color=f5c542&labelColor=1f2328" alt="GitHub stars"></a>
     <a href="https://github.com/nicedreamzapp/claude-code-local/network/members"><img src="https://img.shields.io/github/forks/nicedreamzapp/claude-code-local?style=for-the-badge&logo=github&color=4c9a2a&labelColor=1f2328" alt="GitHub forks"></a>
-    <a href="#-the-lineup--pick-your-fighter"><img src="https://img.shields.io/badge/🥊_Lineup-6_Models-red?style=for-the-badge" alt="6 Models"></a>
+    <a href="#-the-lineup--pick-your-fighter"><img src="https://img.shields.io/badge/🥊_Lineup-7_Models-red?style=for-the-badge" alt="7 Models"></a>
     <a href="#-benchmarks"><img src="https://img.shields.io/badge/⚡_Qwen_3.5-65_tok%2Fs-brightgreen?style=for-the-badge" alt="Qwen 3.5 speed"></a>
     <a href="#-benchmarks"><img src="https://img.shields.io/badge/🚀_Claude_Code_Task-17.6s-blue?style=for-the-badge" alt="Claude Code task time"></a>
     <a href="#-privacy--how-the-data-flows"><img src="https://img.shields.io/badge/🔒_Privacy-100%25_Local-success?style=for-the-badge" alt="100% Local"></a>
@@ -68,7 +68,7 @@ Your Mac has a powerful GPU built right into the chip. This project uses that GP
           │  HTTP localhost:4000
      ⚡ MLX Native Server      ← this repo (~1000 lines of Python)
           │
-     🥊 Pick your fighter     ← Hermes · Gemma · Muse-Glimmer · Llama 3.3 · Qwen · DeepSeek
+     🥊 Pick your fighter     ← Hermes · Gemma · Muse-Glimmer · Qwen 3.8 · Llama 3.3 · Qwen 3.5 · DeepSeek
           │
      🖥️  Apple Silicon GPU    ← your M-series chip does all the work
 ```
