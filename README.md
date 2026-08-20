@@ -56,22 +56,7 @@ No API key. No second subscription. No waiting until 3pm. It works on a **16 GB 
 
 Your Mac has a powerful GPU built right into the chip. This project uses that GPU to run **massive AI models — the same kind that power ChatGPT and Claude — entirely on your computer**, and plugs them into Claude Code so the whole coding experience works offline.
 
-🚫 No internet needed
-💰 No monthly subscription
-🔒 No one sees your code or data
-✅ Full Claude Code experience — write code, edit files, manage projects, control your browser, or run a full hands-free voice session
-
-```
-         📱 You (Mac or Phone)
-          │
-     🤖 Claude Code           ← the AI coding tool you know
-          │  HTTP localhost:4000
-     ⚡ MLX Native Server      ← this repo (~1000 lines of Python)
-          │
-     🥊 Pick your fighter     ← Hermes · Gemma · Muse-Glimmer · Qwen 3.8 · Llama 3.3 · Qwen 3.5 · DeepSeek
-          │
-     🖥️  Apple Silicon GPU    ← your M-series chip does all the work
-```
+No internet, no subscription, nobody sees your code — and it's the full Claude Code experience: edit files, manage projects, drive your browser, or run a hands-free voice session.
 
 **The trick:** Claude Code speaks the **Anthropic API**. Local model servers speak the **OpenAI API**. So everyone bolts a translation proxy in between — and the proxy is slow and fragile. This server speaks Anthropic natively. One process, zero translations:
 
@@ -132,7 +117,7 @@ We started with one model. Now we ship a **roster** — and it's a **living line
 >
 > 🧪 **Muse-Glimmer just landed (Aug 2026)** — Meta's new agentic 30B, [abliterated in-house](#-our-own-mlx-abliterated-uploads) (our first self-abliteration). Decode speed is measured — **~18 tok/s** on an M-series Max, 8-bit (a touch quicker than Gemma 4 31B).
 >
-> 👁️ **Now with vision.** The new [`-MM-bf16`](https://huggingface.co/divinetribe/Muse-Glimmer-30B-Abliterated-MM-bf16) build keeps the full vision tower, so the same abliterated model *reads images* — recognition, fine-grained ID, landmarks, in-the-wild OCR, and chart reading, all on-device. We believe it's the **first abliterated multimodal model running on Apple Silicon**. It runs through our own [`mlx-vlm-muse-glimmer`](https://github.com/nicedreamzapp/mlx-vlm-muse-glimmer) model class. **[▶ Watch the vision demo](https://www.youtube.com/watch?v=5fs_FfkCaDA)** — it names the exact Jaguar F-Type from the spoiler with the badge blurred, places the Taj Mahal, reads a neon sign, and pulls a value off a bar chart. That's the living-repo deal: it goes in the day it drops, the numbers land as we test it.
+> 👁️ **Now with vision** via the [`-MM-bf16`](https://huggingface.co/divinetribe/Muse-Glimmer-30B-Abliterated-MM-bf16) build — **[watch it read a chart, a neon sign and a blurred car badge](https://www.youtube.com/watch?v=5fs_FfkCaDA)**. Details in [our uploads](#-our-own-mlx-abliterated-uploads).
 
 > 💻 **Got a 16 GB MacBook Air?** Start with Hermes. `setup.sh` picks it for you automatically — you don't need 96 GB of RAM to use this.
 
@@ -311,17 +296,6 @@ The server (`proxy/server.py`) is **one file, ~1000 lines**. It does six things:
 5. ⚡ **Reuses prompt caches across requests** — Claude Code's system prompt doesn't get re-prefilled every turn. Huge speedup for short questions.
 6. 🎯 **Code mode** — auto-detects Claude Code coding sessions, swaps the ~10K-token harness prompt for a slim ~150-token one, and strips verbose tool descriptions to name + parameter types. A **28× prompt reduction** that cuts prefill from ~60 s to ~2 s on Gemma 4 31B.
 
-### 🛤️ The Journey
-
-We didn't start here. Three generations in one night:
-
-| Gen | What We Tried | Speed | 💡 What We Learned |
-|:---:|---|:---:|---|
-| 1️⃣ | Ollama + custom proxy | 30 tok/s | Ollama works but Claude Code can't talk to it directly |
-| 2️⃣ | llama.cpp TurboQuant + proxy | 41 tok/s | TurboQuant compresses KV cache 4.9x, but the proxy is the bottleneck |
-| 3️⃣ | **MLX native server** | **65 tok/s** | **Kill the proxy. Speak Anthropic API directly. 7.5x faster.** |
-| 4️⃣ | **The lineup** | 65 / 15 / 7 tok/s | Three brains, one server — swap one env var to change the fighter |
-
 ---
 
 ## 🔒 Privacy + How the Data Flows
@@ -374,22 +348,9 @@ This is the part we're proudest of. **Your code never leaves your Mac.** Not for
 
 > ⚠️ We **[removed LiteLLM](https://x.com/Tahseen_Rahman/status/2035501506242240520)** after supply-chain attack concerns. Every dependency was re-audited from scratch. If a package had unexplained network calls, it didn't ship.
 
-### ✈️ When To Use This
-
-| Situation | Use This? | Why |
-|-----------|:---------:|-----|
-| On a plane (no wifi) | ✅ | Full AI coding, no internet needed |
-| NDA / sensitive client code | ✅ | Nothing leaves your machine — air-gapped, `lsof`-verified |
-| Healthcare / legal / finance review | ✅ | 100% on-device, audit-friendly |
-| Don't want API fees | ✅ | $0/month forever |
-| Want fastest possible | ☁️ | Cloud Sonnet is still slightly faster |
-| Need Claude-level reasoning | ☁️ | Local models are good, not Claude-level |
-
 ---
 
 ## 📊 Benchmarks
-
-Four generations of optimization. Each one got faster.
 
 ### ⚡ Speed Comparison
 
@@ -459,15 +420,6 @@ Anthropic-protocol server, including this repo's proxy.
 This builds directly on the prompt-cache trim work contributed in #46 — that
 fix is what made the deeper rotating-cache problem visible. Thank you.
 
-### 🥊 Lineup Comparison
-
-| Model | tok/s | RAM | Best For |
-|---|:---:|:---:|---|
-| 🟢 Gemma 4 31B Abliterated | ~15 | ~18 GB | Daily coding on a 64 GB Mac |
-| 🟣 **Qwen 3.8 27B bf16 + DFlash 2** | **36.5** (9.7 plain) | ~59 GB | Full precision at quantized speed, 262 K context, vision |
-| 🟠 Llama 3.3 70B Abliterated | ~7 | ~70 GB | Hardest reasoning, full precision |
-| 🔵 **Qwen 3.5 122B-A10B** | **65** | ~75 GB | Maximum throughput, MoE sparsity |
-
 ### ☁️ vs Cloud APIs
 
 | | 🖥️ **Our Local Setup** | ☁️ Claude Sonnet | ☁️ Claude Opus |
@@ -477,7 +429,7 @@ fix is what made the deeper rotating-cache problem visible. Thank you.
 | Privacy | **100% local** 🔒 | Cloud | Cloud |
 | Works offline | **Yes** ✈️ | No | No |
 
-> 💡 Our local setup **beats cloud Opus on raw speed** (65 vs 40 tok/s) at $0/month. Qwen numbers measured on M5 Max 128 GB — full details in [BENCHMARKS.md](docs/BENCHMARKS.md).
+> Qwen 3.5 numbers measured on an M5 Max 128 GB — full runs, including Qwen 3.8 at bf16, in [BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ---
 
