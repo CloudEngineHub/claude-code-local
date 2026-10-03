@@ -250,6 +250,7 @@ on your hardware. If Claude Code on your own Mac was the part you wanted, this i
 | 🌐 | [browser-agent](https://github.com/nicedreamzapp/browser-agent) | Drives your real browser |
 | 🚦 | [browser-broker](https://github.com/nicedreamzapp/browser-broker) | Gives each AI agent its own browser tab so nobody fights |
 | 📱 | [claude-screen-to-phone](https://github.com/nicedreamzapp/claude-screen-to-phone) | Control Claude Code from your iPhone |
+| 🌙 | [Moonstone](https://github.com/nicedreamzapp/moonstone) | Every Claude Code session on every machine in one window, with push-to-talk and spoken answers |
 | 🛟 | [claude-failover](https://github.com/nicedreamzapp/claude-failover) | Keep cloud Claude first, flip to local with one command |
 | 👁️ | [nemotron-omni-mlx](https://github.com/nicedreamzapp/nemotron-omni-mlx) | NVIDIA's tri-modal Nemotron seeing and hearing on Apple Silicon. The only open MLX runtime for its vision and audio towers, 23/23 parity tests against NVIDIA's own reference |
 | 🏁 | [Agent-12](https://github.com/nicedreamzapp/agent12) | The open leaderboard the model table above is scored on. Filesystem-judged, no AI grader |
