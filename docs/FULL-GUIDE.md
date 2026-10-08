@@ -560,7 +560,7 @@ Every one of these landed on hardware I don't own, on a bug I hadn't hit. Thank 
 
 Tested on **Apple M5 Max** with **128 GB unified memory**.
 
-Built by [Matt Macosko](https://x.com/NiceDreamzApps) in Humboldt, CA — one person, no team, no investors; the MLX server, the [leaderboard](https://nicedreamzapp.github.io/agent12/), the [abliterated uploads](https://huggingface.co/divinetribe), the voice loop and the phone bridge are all his. **Open to work** on local-AI and Apple Silicon inference — matt@ineedhemp.com. Part of [Nice Dreamz LLC](https://nicedreamzwholesale.com). More open-source at [nicedreamzwholesale.com/software](https://nicedreamzwholesale.com/software/) · demos at [youtube.com/@nicedreamzapps](https://www.youtube.com/@nicedreamzapps).
+Built by [Matt Macosko](https://x.com/NiceDreamzApps) in Humboldt, CA. The MLX server, the [leaderboard](https://nicedreamzapp.github.io/agent12/), the [abliterated uploads](https://huggingface.co/divinetribe), the voice loop and the phone bridge are all his. **Open to work** on local-AI and Apple Silicon inference — matt@ineedhemp.com. Part of [Nice Dreamz LLC](https://nicedreamzwholesale.com). More open-source at [nicedreamzwholesale.com/software](https://nicedreamzwholesale.com/software/) · demos at [youtube.com/@nicedreamzapps](https://www.youtube.com/@nicedreamzapps).
 
 <p>
   <a href="https://x.com/NiceDreamzApps"><img src="https://img.shields.io/badge/X-@NiceDreamzApps-000000?style=flat-square&logo=x&logoColor=white" alt="X"></a>
