@@ -323,7 +323,7 @@ the [full guide](docs/FULL-GUIDE.md#-credits).
 
 <div align="center">
 
-Built by **[Matt Macosko](https://x.com/NiceDreamzApps)** in Arcata, California: one person, no team, no investors.
+Built by **[Matt Macosko](https://x.com/NiceDreamzApps)** in Humboldt, California: one person, no team, no investors.
 **Open to work** on local AI and Apple Silicon: matt@ineedhemp.com
 
 [Nice Dreamz software](https://nicedreamzwholesale.com/software/) · [YouTube demos](https://www.youtube.com/@nicedreamzapps) · [Discord](https://discord.gg/ZdSqgAxUW)
