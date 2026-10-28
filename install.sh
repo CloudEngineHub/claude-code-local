@@ -4,13 +4,16 @@
 #   curl -fsSL https://raw.githubusercontent.com/nicedreamzapp/claude-code-local/main/install.sh | bash
 #
 # Clones the repo to ~/claude-code-local (or updates it if it's already there)
-# and hands off to setup.sh, which picks a model for your Mac's RAM and builds
-# the desktop launcher. Apple Silicon only.
+# and hands off to the right setup for your machine:
+#   macOS (Apple Silicon) -> setup.sh         MLX, on-device
+#   Linux                 -> portable/setup-linux.sh   llama.cpp + a vision model
+# Windows users run install.ps1 instead (see the README).
 
 set -euo pipefail
 
 REPO_URL="https://github.com/nicedreamzapp/claude-code-local"
 INSTALL_DIR="${CCL_DIR:-$HOME/claude-code-local}"
+OS="$(uname -s)"
 
 echo ""
 echo "╔══════════════════════════════════════════════════╗"
@@ -18,32 +21,42 @@ echo "║     Claude Code Local — Installer                ║"
 echo "╚══════════════════════════════════════════════════╝"
 echo ""
 
-# ── Refuse to run anywhere it can't work ──────────────────────
-if [ "$(uname -s)" != "Darwin" ]; then
-  echo "✗ This only runs on macOS (Apple Silicon)."
-  exit 1
-fi
-
-if [ "$(uname -m)" != "arm64" ]; then
-  echo "✗ This needs Apple Silicon (M1 or newer). Detected: $(uname -m)"
-  exit 1
-fi
-
-if ! command -v git >/dev/null 2>&1; then
-  echo "✗ git not found. Install the Xcode command line tools first:"
-  echo "    xcode-select --install"
-  exit 1
-fi
-
-MEM_GB=$(sysctl -n hw.memsize 2>/dev/null | awk '{print int($1/1073741824)}')
-echo "  Mac:    $(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo 'Apple Silicon')"
-echo "  Memory: ${MEM_GB} GB"
-echo ""
-
-if [ "$MEM_GB" -lt 16 ]; then
-  echo "  ⚠️  Under 16 GB. setup.sh will pick a small 4B model — it works,"
-  echo "      but tool calling will be noticeably less reliable."
+# ── Per-OS preflight ──────────────────────────────────────────
+if [ "$OS" = "Darwin" ]; then
+  if [ "$(uname -m)" != "arm64" ]; then
+    echo "✗ macOS build needs Apple Silicon (M1 or newer). Detected: $(uname -m)"
+    exit 1
+  fi
+  if ! command -v git >/dev/null 2>&1; then
+    echo "✗ git not found. Install the Xcode command line tools first:"
+    echo "    xcode-select --install"
+    exit 1
+  fi
+  MEM_GB=$(sysctl -n hw.memsize 2>/dev/null | awk '{print int($1/1073741824)}')
+  echo "  Mac:    $(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo 'Apple Silicon')"
+  echo "  Memory: ${MEM_GB} GB"
   echo ""
+  if [ "$MEM_GB" -lt 16 ]; then
+    echo "  ⚠️  Under 16 GB. setup.sh will pick a small 4B model — it works,"
+    echo "      but tool calling will be noticeably less reliable."
+    echo ""
+  fi
+elif [ "$OS" = "Linux" ]; then
+  if ! command -v git >/dev/null 2>&1; then
+    echo "✗ git not found. Install it with your package manager, e.g.:"
+    echo "    sudo apt-get install -y git   (Debian/Ubuntu)"
+    exit 1
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "✗ python3 not found. Install it first, e.g.:"
+    echo "    sudo apt-get install -y python3   (Debian/Ubuntu)"
+    exit 1
+  fi
+  echo "  Linux:  $(uname -m)"
+  echo ""
+else
+  echo "✗ Unsupported OS: $OS. macOS and Linux use this script; Windows uses install.ps1."
+  exit 1
 fi
 
 # ── Clone or update ───────────────────────────────────────────
@@ -62,4 +75,8 @@ fi
 
 echo ""
 cd "$INSTALL_DIR"
-exec bash setup.sh
+if [ "$OS" = "Darwin" ]; then
+  exec bash setup.sh
+else
+  exec bash portable/setup-linux.sh
+fi
