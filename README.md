@@ -6,6 +6,8 @@
 
 **Your Mac's chip runs the AI · Claude Code works exactly like it always does · nothing leaves your computer**
 
+**Now on Linux and Windows too, same Claude Code, same privacy, your own machine doing the work. Phones are next.**
+
 <a href="https://github.com/hesreallyhim/awesome-claude-code"><img src="https://img.shields.io/badge/Mentioned_in-Awesome_Claude_Code-fc60a8?style=for-the-badge&logo=awesomelists&logoColor=white&labelColor=1f2328" alt="Mentioned in Awesome Claude Code"></a>
 
 <a href="https://github.com/nicedreamzapp/claude-code-local/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/nicedreamzapp/claude-code-local/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI&labelColor=1f2328" alt="CI"></a>
