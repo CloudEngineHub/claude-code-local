@@ -176,8 +176,62 @@ it, just restart the server.
 
 <img src="https://raw.githubusercontent.com/nicedreamzapp/claude-code-local/ce65065a5327476e7fc1f6435116bd31c0e0e80d/assets/readme/s03-rule.svg" width="100%" alt="">
 
-<picture><source media="(max-width: 610px), (min-width: 768px) and (max-width: 895px)" srcset="https://raw.githubusercontent.com/nicedreamzapp/claude-code-local/ce65065a5327476e7fc1f6435116bd31c0e0e80d/assets/readme/s04-banner-m.svg"><source media="(max-width: 1149px)" srcset="https://raw.githubusercontent.com/nicedreamzapp/claude-code-local/ce65065a5327476e7fc1f6435116bd31c0e0e80d/assets/readme/s04-banner-mid.svg"><img src="https://raw.githubusercontent.com/nicedreamzapp/claude-code-local/ce65065a5327476e7fc1f6435116bd31c0e0e80d/assets/readme/s04-banner.svg" width="100%" alt="04. Pick your AI. Same server, same Claude Code, swap the brain"></picture>
-<picture><source media="(max-width: 610px), (min-width: 768px) and (max-width: 895px)" srcset="https://raw.githubusercontent.com/nicedreamzapp/claude-code-local/ce65065a5327476e7fc1f6435116bd31c0e0e80d/assets/readme/s04-r1-m.svg"><source media="(max-width: 1149px)" srcset="https://raw.githubusercontent.com/nicedreamzapp/claude-code-local/ce65065a5327476e7fc1f6435116bd31c0e0e80d/assets/readme/s04-r1-mid.svg"><img src="https://raw.githubusercontent.com/nicedreamzapp/claude-code-local/ce65065a5327476e7fc1f6435116bd31c0e0e80d/assets/readme/s04-r1.svg" width="100%" alt="Qwen 3.8 27B. Careful coding and pictures, 96 GB Macs. Gemma 4 31B. Daily coding and the browser agent. Hermes 4 14B. 16 GB MacBooks."></picture>
+## 🐧🪟 On Linux or a Windows PC
+
+MLX on Apple Silicon is still the heart of this project and always will be, it's what we run every
+day. We extended it to everything else so nobody gets left out: the same Claude Code, running on your
+own machine, now works on Linux and Windows too. Off a Mac there is no MLX, so the AI runs on
+**llama.cpp** instead, and the installer does the whole "download and go" for you: it looks at your
+hardware (NVIDIA, AMD, or just your CPU), grabs the right pinned llama.cpp build, picks the best model
+that fits your memory at the highest precision it can, downloads it, and launches Claude Code pointed
+at it. Phones are the next frontier, we're working on it.
+
+Every model it can pick **can see images**, so screenshots you paste into Claude Code work the same as
+they do on the cloud.
+
+**Linux (one command):**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nicedreamzapp/claude-code-local/main/install.sh | bash
+```
+
+**Windows (PowerShell):**
+
+```powershell
+irm https://raw.githubusercontent.com/nicedreamzapp/claude-code-local/main/install.ps1 | iex
+```
+
+You need **git**, **Python 3**, and **Claude Code** installed. When it finishes, run **`claude-local`**
+(Linux) or double-click **Claude Local** on your Desktop (Windows).
+
+It picks the strongest vision model that fits and tells you why, for example:
+
+| Your hardware | What you get |
+|---|---|
+| 24 GB NVIDIA card | Qwen 3.5 9B at full BF16 |
+| 12 GB NVIDIA card | Qwen 3.5 4B at full BF16 |
+| AMD or Vulkan GPU | the largest that fits in VRAM |
+| No GPU (CPU only) | a 4B or 9B vision model, sized to your RAM |
+
+Want a specific one? `CCL_MODEL_ID=gemma-4-12b claude-local`. The catalog lives in
+[`portable/catalog.json`](portable/catalog.json).
+
+### What it depends on (and how we'd replace it)
+
+We stay independent on purpose. The portable path leans on exactly two outside things:
+
+- **llama.cpp** (MIT licensed) runs the model. We pin an exact release by version and verify its
+  checksum, so an upstream change can never move under us. If it ever went away we already ship the
+  Mac engine (`proxy/server.py`), and the GGUF format is open.
+- **Hugging Face** hosts the model weights. We pin each file's size and SHA-256. If it went down the
+  same files mirror anywhere; swap the URL in `portable/catalog.json` and the checksums still hold.
+
+No Ollama, no LM Studio, no company account, no telemetry. The proxy that turns Claude Code's requests
+into model calls is our own code, the same hardened translation the Mac build uses.
+
+---
+
+## 🥊 Pick your AI
 
 Same server, same Claude Code. Swap one setting and you swap the brain. Links to every build are just below the table.
 
