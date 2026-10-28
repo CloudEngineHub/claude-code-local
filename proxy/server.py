@@ -29,12 +29,21 @@ import uuid
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
 
-import mlx.core as mx
-import mlx.nn as nn
-from mlx_lm.utils import load
-from mlx_lm.generate import stream_generate
-from mlx_lm.sample_utils import make_sampler
-from mlx_lm.models.cache import make_prompt_cache
+# MLX is the Mac inference backend. Guard the import so this module can also be
+# imported on Linux/Windows (which have no MLX) purely to reuse the pure
+# Anthropic<->tool-call translation helpers below — portable/portable_server.py
+# does exactly that and talks to llama.cpp instead. On a Mac nothing changes:
+# the import succeeds and MLX_AVAILABLE is True.
+try:
+    import mlx.core as mx
+    import mlx.nn as nn
+    from mlx_lm.utils import load
+    from mlx_lm.generate import stream_generate
+    from mlx_lm.sample_utils import make_sampler
+    from mlx_lm.models.cache import make_prompt_cache
+    MLX_AVAILABLE = True
+except ImportError:
+    MLX_AVAILABLE = False
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -1121,6 +1130,81 @@ def optimize_for_code(body):
 
 _first_request = True
 
+# A model that meant to call a tool but produced something parse_tool_calls
+# couldn't read usually leaves one of these fingerprints in the text. Shared by
+# both backends (MLX here, llama.cpp in portable_server.py) so the retry trigger
+# is identical everywhere.
+TOOL_INTENT_PHRASES = [
+    "here's the command", "bash(", "read(", "edit(", "write(",
+    "<tool_call>", "<function=", "<tools>", '"name":', '"arguments":',
+    '"parameters":', "```json", "```tool",
+]
+
+
+def assemble_anthropic_message(remaining_text, tool_calls, body, anthropic_tools,
+                               prompt_tokens, gen_tokens, finish_reason="end_turn",
+                               stop_sequence=None):
+    """Turn cleaned text + parsed tool calls into an Anthropic Messages response.
+
+    Backend-agnostic: the MLX path and the llama.cpp portable path both hand their
+    parsed result here so the Claude-Code-2.1 quirk handling lives in one place —
+    no empty leading text block (it makes Claude Code discard the tool_use that
+    follows), and input keys the model hallucinated are dropped against the real
+    tool schema (Claude Code silently rejects a tool_use with undeclared fields).
+    """
+    content_blocks = []
+
+    if remaining_text.strip():
+        content_blocks.append({"type": "text", "text": remaining_text.strip()})
+
+    if tool_calls:
+        current_tools = body.get("tools", []) or anthropic_tools or []
+        tool_schemas = {}
+        for atool in current_tools:
+            schema = atool.get("input_schema") or {}
+            props = schema.get("properties") or {}
+            tool_schemas[atool.get("name", "")] = set(props.keys())
+        if os.environ.get("MLX_DEBUG_RESPONSE"):
+            log(f"  TOOL SCHEMAS: {tool_schemas}")
+
+        for tc in tool_calls:
+            tool_id = f"toolu_{uuid.uuid4().hex[:24]}"
+            raw_input = tc["arguments"] if isinstance(tc.get("arguments"), dict) else {}
+            allowed = tool_schemas.get(tc["name"])
+            if allowed is not None:
+                filtered = {k: v for k, v in raw_input.items() if k in allowed}
+                dropped = [k for k in raw_input if k not in allowed]
+                if dropped:
+                    log(f"  Filtered extra input keys for {tc['name']}: {dropped}")
+                tool_input = filtered
+            else:
+                tool_input = raw_input
+            content_blocks.append({
+                "type": "tool_use",
+                "id": tool_id,
+                "name": tc["name"],
+                "input": tool_input,
+            })
+        finish_reason = "tool_use"
+        log(f"  Tool calls: {', '.join(tc['name'] for tc in tool_calls)}")
+
+    if not content_blocks:
+        content_blocks.append({"type": "text", "text": "(No output)"})
+
+    return {
+        "id": f"msg_{uuid.uuid4().hex[:24]}",
+        "type": "message",
+        "role": "assistant",
+        "model": body.get("model", "claude-sonnet-4-6"),
+        "content": content_blocks,
+        "stop_reason": finish_reason,
+        "stop_sequence": stop_sequence,
+        "usage": {
+            "input_tokens": prompt_tokens,
+            "output_tokens": gen_tokens,
+        }
+    }
+
 def count_prompt_tokens(body):
     """Token count for an Anthropic request body, same path inference takes.
 
@@ -1367,15 +1451,10 @@ def generate_response(body, on_start=None, on_text=None):
         tool_calls, remaining_text = [], text
 
     # ─── Retry logic: if model expressed intent to use a tool but we got no valid calls ───
-    tool_intent_phrases = [
-        "here's the command", "bash(", "read(", "edit(", "write(",
-        "<tool_call>", "<function=", "<tools>", '"name":', '"arguments":',
-        '"parameters":', "```json", "```tool",
-    ]
     # llm_tools guard: a request with no tools can never need a tool-call
     # retry — without it, chat answers containing '```json' etc. triggered
     # a pointless (and confusing) re-generation.
-    if llm_tools and not tool_calls and any(p in remaining_text.lower() for p in tool_intent_phrases):
+    if llm_tools and not tool_calls and any(p in remaining_text.lower() for p in TOOL_INTENT_PHRASES):
         log(f"  Tool intent detected but parser missed it. Raw text (400 chars): {remaining_text[:400]!r}")
         for retry in range(MAX_TOOL_RETRIES):
             log(f"  Retry {retry+1}/{MAX_TOOL_RETRIES}: tool intent detected but no valid tool call, re-prompting")
@@ -1425,75 +1504,11 @@ def generate_response(body, on_start=None, on_text=None):
             else:
                 log(f"  Retry {retry+1} failed, still no valid tool call")
 
-    # Build content blocks
-    content_blocks = []
-
-    if remaining_text.strip():
-        content_blocks.append({"type": "text", "text": remaining_text.strip()})
-
-    if tool_calls:
-        # NOTE: previously this branch prepended an empty text block
-        # ({"type":"text","text":""}) "because Anthropic requires at least one
-        # block". That's incorrect — the Anthropic API accepts a content list
-        # made up of only tool_use blocks. The empty text block actively breaks
-        # Claude Code 2.1: it reads the first (empty) text block, decides the
-        # response is "(No output)", and silently discards the tool_use blocks
-        # that follow. Drop the empty text block entirely.
-
-        # Build a {tool_name: allowed_input_keys} map from the request schema
-        # so we can drop any extra keys the model hallucinated. Claude Code
-        # 2.1 silently rejects a tool_use response whose input has fields not
-        # declared in the tool's input_schema (e.g. Qwen 2.5 likes to add a
-        # "description" field next to "command" for Bash).
-        # Note: anthropic_tools here is the (possibly filtered) tool list
-        # the request actually sent — we must rebuild from `body["tools"]`
-        # to honor any code-mode trimming applied earlier in this function.
-        current_tools = body.get("tools", []) or anthropic_tools or []
-        tool_schemas = {}
-        for atool in current_tools:
-            schema = atool.get("input_schema") or {}
-            props = schema.get("properties") or {}
-            tool_schemas[atool.get("name", "")] = set(props.keys())
-        if os.environ.get("MLX_DEBUG_RESPONSE"):
-            log(f"  TOOL SCHEMAS: {tool_schemas}")
-
-        for tc in tool_calls:
-            tool_id = f"toolu_{uuid.uuid4().hex[:24]}"
-            raw_input = tc["arguments"] if isinstance(tc.get("arguments"), dict) else {}
-            allowed = tool_schemas.get(tc["name"])
-            if allowed is not None:
-                filtered = {k: v for k, v in raw_input.items() if k in allowed}
-                dropped = [k for k in raw_input if k not in allowed]
-                if dropped:
-                    log(f"  Filtered extra input keys for {tc['name']}: {dropped}")
-                tool_input = filtered
-            else:
-                tool_input = raw_input
-            content_blocks.append({
-                "type": "tool_use",
-                "id": tool_id,
-                "name": tc["name"],
-                "input": tool_input,
-            })
-        finish_reason = "tool_use"
-        log(f"  Tool calls: {', '.join(tc['name'] for tc in tool_calls)}")
-
-    if not content_blocks:
-        content_blocks.append({"type": "text", "text": "(No output)"})
-
-    return {
-        "id": f"msg_{uuid.uuid4().hex[:24]}",
-        "type": "message",
-        "role": "assistant",
-        "model": body.get("model", "claude-sonnet-4-6"),
-        "content": content_blocks,
-        "stop_reason": finish_reason,
-        "stop_sequence": stop_sequence,
-        "usage": {
-            "input_tokens": prompt_tokens,
-            "output_tokens": gen_tokens,
-        }
-    }
+    # Build the Anthropic response (shared with the llama.cpp portable backend).
+    return assemble_anthropic_message(
+        remaining_text, tool_calls, body, anthropic_tools,
+        prompt_tokens, gen_tokens, finish_reason, stop_sequence,
+    )
 
 
 # ─── HTTP Handler ────────────────────────────────────────────────────────────

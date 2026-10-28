@@ -7,9 +7,16 @@ Tests multi-step tool-use tasks to verify the model can reliably emit tool calls
 import json
 import sys
 import time
+import os
 import requests
 
-SERVER = "http://localhost:4000"
+# CCL_TEST_SERVER points the harness at another server (e.g. the llama.cpp
+# backend on Linux/Windows). Default is unchanged: the Mac MLX server.
+SERVER = os.environ.get("CCL_TEST_SERVER", "http://localhost:4000")
+TIMEOUT = float(os.environ.get("CCL_TEST_TIMEOUT", "120"))
+# Optional: CCL_TEST_TEMPERATURE=0 makes runs repeatable, so a before/after
+# comparison of a server change is apples to apples.
+TEMPERATURE = os.environ.get("CCL_TEST_TEMPERATURE")
 PASS = 0
 FAIL = 0
 RESULTS = []
@@ -100,8 +107,10 @@ def send_message(messages, system="You are a helpful coding assistant. When aske
         "messages": messages,
         "tools": TOOLS,
     }
+    if TEMPERATURE is not None:
+        body["temperature"] = float(TEMPERATURE)
     t0 = time.time()
-    resp = requests.post(f"{SERVER}/v1/messages", json=body, timeout=120)
+    resp = requests.post(f"{SERVER}/v1/messages", json=body, timeout=TIMEOUT)
     elapsed = time.time() - t0
     data = resp.json()
     return data, elapsed
