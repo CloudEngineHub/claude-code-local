@@ -31,6 +31,16 @@ import time
 import urllib.request
 import zipfile
 
+# On Windows the console defaults to a legacy code page (cp1252) that cannot
+# encode the arrows/box characters we print, which crashes detect/install with
+# UnicodeEncodeError. Force UTF-8 on our streams so output never aborts the run.
+if sys.platform == "win32":
+    for _s in (sys.stdout, sys.stderr):
+        try:
+            _s.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 PRECISION_ORDER = ["BF16", "Q8_0", "Q6_K", "Q4_K_M"]
@@ -131,6 +141,12 @@ def detect_hw():
     mach = platform.machine().lower()
     arch = "arm64" if mach in ("arm64", "aarch64") else "x64"
     accel, vram = detect_gpu()
+    # Vulkan on an integrated GPU (e.g. Intel Iris Xe) advertises itself but
+    # exposes no usable device-local heap to size; under 2 GB we cannot offload,
+    # so treat it as CPU-only. This keeps the pinned-build pick, ngl, and the RAM
+    # budget consistent instead of pulling the Vulkan binary we'd never offload to.
+    if accel == "vulkan" and vram < 2:
+        accel, vram = None, 0.0
     ram = detect_ram_gb()
     return {"os": osname, "arch": arch, "accel": accel,
             "vram_gb": round(vram, 1), "ram_gb": round(ram, 1)}

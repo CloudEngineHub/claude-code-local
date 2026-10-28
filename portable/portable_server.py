@@ -37,6 +37,15 @@ import urllib.error
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
 
+# Windows' legacy cp1252 console cannot encode the banner/log characters we
+# print, which would crash the proxy on startup. Force UTF-8 on our streams.
+if sys.platform == "win32":
+    for _s in (sys.stdout, sys.stderr):
+        try:
+            _s.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+
 # Reuse the hardened translation layer from the Mac server. Its MLX import is
 # guarded, so importing it here (no MLX installed) is fine and gives us the real,
 # battle-tested helpers with zero duplication.
