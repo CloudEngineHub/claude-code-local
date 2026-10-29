@@ -68,6 +68,20 @@ else
   echo "· MLX virtualenv not found (already removed)"
 fi
 
+# ── "keep going" command and its .zshrc line ───────────────────
+KG="$HOME/.local/bin/keepgoing"
+if [ -L "$KG" ] && readlink "$KG" | grep -q "/bin/keepgoing$"; then
+  rm -f "$KG"
+  echo "✓ Removed $KG"
+fi
+ZSHRC="$HOME/.zshrc"
+if [ -f "$ZSHRC" ] && grep -q "scripts/keepgoing-shell.sh" "$ZSHRC"; then
+  tmp="$(mktemp)"
+  grep -v -e "scripts/keepgoing-shell.sh" -e '^# Claude Code Local: type "keep going"' "$ZSHRC" >"$tmp" || true
+  cat "$tmp" >"$ZSHRC" && rm -f "$tmp"
+  echo "✓ Removed the keep going line from ~/.zshrc"
+fi
+
 # The iMessage phone scripts in ~/.claude/ belong to the "phone" add-on
 # (claude-screen-to-phone); remove them with --with phone.
 

@@ -166,10 +166,15 @@ menu() {
   local n=0 a
   for a in $ADDONS; do n=$((n + 1)); printf '  %d) %-9s %s\n' "$n" "$a" "$(addon_desc "$a")"; done
   echo ""
-  local pick
-  printf 'Pick numbers or names (e.g. "1 3" or "voice,phone"), "all", or Enter for none: '
-  IFS= read -r pick </dev/tty || pick=""
-  [ -n "$pick" ] || { echo "No add-ons. Add them later: bash $0 install <names>"; return 0; }
+  local pick tries=0
+  while :; do
+    printf 'Pick numbers or names (e.g. "1 3" or "voice,phone"), "all", or Enter for none: '
+    IFS= read -r pick </dev/tty || pick=""
+    [ -n "$pick" ] || { echo "No add-ons. Add them later: bash $0 install <names>"; return 0; }
+    normalize_addons "$pick" >/dev/null && break
+    tries=$((tries + 1))
+    [ "$tries" -lt 3 ] || { echo "No add-ons installed."; return 1; }
+  done
   install_addons "$pick"
 }
 

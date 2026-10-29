@@ -56,7 +56,7 @@ bash setup.sh
 | Server | `~/.local/mlx-native-server/server.py`, a **symlink** to `proxy/server.py` in your checkout. Edit the repo copy and restart the server; there is no second copy to drift. |
 | Desktop launcher | `~/Desktop/Claude Local.command`, generated with the chosen model baked in |
 | `keep going` | `~/.local/bin/keepgoing` symlinked to `bin/keepgoing`, and a `source .../scripts/keepgoing-shell.sh` line appended to `~/.zshrc` if it is not there yet |
-| Phone scripts (optional) | Copies `scripts/imessage-*.sh` to `~/.claude/` only if they exist in the checkout. They are not bundled in this repo, so setup prints a pointer to [claude-screen-to-phone](https://github.com/nicedreamzapp/claude-screen-to-phone) instead. |
+| Add-ons | `scripts/addons.sh`: a menu (read from `/dev/tty`, so it works under `curl \| bash`) or `--with voice,browser,phone,remote,moonstone,failover` / `--with all`. Each add-on runs its own repo's installer. The iMessage phone scripts in `~/.claude/` come from the `phone` add-on ([claude-screen-to-phone](https://github.com/nicedreamzapp/claude-screen-to-phone)). No terminal and no `--with` means no add-ons. |
 
 ### Model chosen by memory
 
@@ -119,11 +119,10 @@ claude --model claude-sonnet-4-6
 ```bash
 bash uninstall.sh                # removes everything below, including downloaded models
 bash uninstall.sh --keep-models  # keeps the Hugging Face model weights
+bash uninstall.sh --with phone,remote   # also runs those add-ons' own uninstallers
+bash uninstall.sh --all --purge         # every add-on too, and their data and config
 ```
 
-It removes `~/Desktop/Claude Local.command`, `~/.local/mlx-native-server`, `~/.local/mlx-server`, the `imessage-*.sh` phone scripts and `screen-to-phone-config.sh` in `~/.claude/`, kills the process listening on port 4000, deletes `/tmp/mlx-server.log`, and, unless you pass `--keep-models`, deletes from `~/.cache/huggingface/hub` the five models `setup.sh` can pick plus two older picks (`mlx-community/Qwen3.5-122B-A10B-4bit`, `mlx-community/Qwen3.5-4B-4bit`). Models you downloaded any other way are left alone. It leaves Homebrew, Python 3.12 and the Claude Code CLI alone.
-
-!!! info "TODO-VERIFY"
-    `uninstall.sh` does not remove the `~/.local/bin/keepgoing` symlink or the `keepgoing-shell.sh` line that `setup.sh` adds to `~/.zshrc`. Remove those by hand if you want them gone.
+It removes `~/Desktop/Claude Local.command`, `~/.local/mlx-native-server`, `~/.local/mlx-server`, the `~/.local/bin/keepgoing` symlink and its `~/.zshrc` line, stops the server on port 4000 (`CCL_PORT`) only if it is this repo's `server.py`, deletes `/tmp/mlx-server.log`, and, unless you pass `--keep-models`, deletes from `~/.cache/huggingface/hub` the five models `setup.sh` can pick plus two older picks (`mlx-community/Qwen3.5-122B-A10B-4bit`, `mlx-community/Qwen3.5-4B-4bit`). Models you downloaded any other way are left alone. It leaves Homebrew, Python 3.12, the Claude Code CLI and the add-ons alone unless you pass `--with` or `--all`.
 
 Next: [Quickstart](quickstart.md).

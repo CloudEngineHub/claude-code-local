@@ -146,6 +146,22 @@ bash setup.sh
 Setup picks your model, downloads it, installs the server, and puts **`Claude Local.command`** on
 your Desktop. **Double-click it** and you're coding locally. 🎉
 
+**Add-ons (macOS).** After the model is set up, setup offers a menu of add-ons. Each is its own repo,
+installed by that repo's own one-line installer: `voice` ([NarrateClaude](https://github.com/nicedreamzapp/NarrateClaude)),
+`browser` ([browser-agent](https://github.com/nicedreamzapp/browser-agent)), `phone` ([claude-screen-to-phone](https://github.com/nicedreamzapp/claude-screen-to-phone)),
+`remote` ([FiaOS](https://github.com/nicedreamzapp/FiaOS)), `moonstone` ([Moonstone](https://github.com/nicedreamzapp/moonstone))
+and `failover` ([claude-failover](https://github.com/nicedreamzapp/claude-failover)). Skip the menu:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nicedreamzapp/claude-code-local/main/install.sh | bash -s -- --with voice,browser,phone
+curl -fsSL https://raw.githubusercontent.com/nicedreamzapp/claude-code-local/main/install.sh | bash -s -- --with all
+bash ~/claude-code-local/scripts/addons.sh menu      # add more later
+```
+
+With no terminal to ask on and no `--with`, no add-ons are installed.
+
+**Uninstall:** `bash ~/claude-code-local/uninstall.sh` (add `--with phone,remote` or `--all` to remove add-ons too, `--purge` to delete their data).
+
 > 🐛 **Asked to sign in to a Claude account?** Your `claude` is too old. Update it:
 > `npm install -g @anthropic-ai/claude-code`
 
