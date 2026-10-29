@@ -137,6 +137,7 @@ if [ ! -f "$CLAUDE_BIN" ]; then
   CLAUDE_BIN="\$HOME/.local/bin/claude"
 fi
 
+mkdir -p "$HOME/Desktop"
 LAUNCHER="$HOME/Desktop/Claude Local.command"
 cat > "$LAUNCHER" <<LAUNCH
 #!/bin/bash
