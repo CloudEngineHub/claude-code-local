@@ -10,7 +10,7 @@ that make it quick to fix:
 
 - your Mac (chip and RAM) and macOS version
 - the model you ran
-- what `bash scripts/doctor.sh` prints
+- the block from `bash scripts/doctor.sh --report` (Windows: `scripts\doctor.ps1 -Report`); it leaves out usernames, paths, hostnames and IPs
 - the last lines of the server log, and what you typed in Claude Code when it went wrong
 
 ## Running the server from the repo

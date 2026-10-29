@@ -23,6 +23,12 @@ body:
     validations:
       required: true
   - type: textarea
+    id: doctor
+    attributes:
+      label: Doctor report
+      description: "Run `bash scripts/doctor.sh --report` (Windows: `powershell -File scripts\\doctor.ps1 -Report`) and paste the block. It leaves out usernames, paths, hostnames and IPs."
+      render: text
+  - type: textarea
     id: description
     attributes:
       label: What happened?

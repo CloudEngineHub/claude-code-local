@@ -12,12 +12,12 @@ description: >-
 
 | Need | Why | Checked by |
 |---|---|---|
-| macOS on Apple Silicon (M1 or newer) | MLX runs on Apple's GPU and unified memory | `install.sh` stops unless `uname -s` is `Darwin` and `uname -m` is `arm64`; `setup.sh` and `doctor.sh` stop unless `arm64` |
+| macOS on Apple Silicon (M1 or newer) | MLX runs on Apple's GPU and unified memory | `install.sh` stops unless `uname -s` is `Darwin` and `uname -m` is `arm64`; `setup.sh` stops unless `arm64`; `doctor.sh` reports it |
 | `git` | `install.sh` clones the repo | `install.sh` stops and suggests `xcode-select --install` |
 | Homebrew | Installs Python 3.12 | `setup.sh` installs Homebrew if `brew` is missing |
 | Python 3.12 | The MLX virtualenv is created with `python3.12` | `setup.sh` runs `brew install python@3.12` if missing |
 | Claude Code CLI | The thing you actually use | `setup.sh` warns if `claude` is not found; install with `npm install -g @anthropic-ai/claude-code` |
-| Disk space | Models are 5 to 30 GB | `doctor.sh` warns under 25 GB free |
+| Disk space | Models are 5 to 30 GB | `doctor.sh` warns under 10 GB free |
 
 !!! warning "Old Claude Code versions"
     If a launcher asks you to sign in to a Claude account, your `claude` is too old. Update it with `npm install -g @anthropic-ai/claude-code`. See [Troubleshooting](troubleshooting.md#claude-code-asks-me-to-log-in).
@@ -76,7 +76,13 @@ bash setup.sh
 ```bash
 bash scripts/doctor.sh          # what fits, what is installed, what is cached
 bash scripts/doctor.sh --bench  # also time a 100-token generation on the recommended model
+bash scripts/doctor.sh --fix    # safe repairs: restart your own service that is down, recreate a missing symlink
+bash scripts/doctor.sh --report # privacy-safe block to paste into a bug report
 ```
+
+On Windows: `powershell -ExecutionPolicy Bypass -File scripts\doctor.ps1` (with `-Fix` or `-Report`). Linux works like the Mac command.
+
+It also checks the Claude Code CLI version, the model server on `MLX_PORT` (default 4000), the model files and the llama.cpp binary on Linux and Windows, and each add-on you have installed (voice, browser, Moonstone, FiaOS, phone, failover, Trinidad Head). Add-ons you never installed show as "not installed", not as errors. `--fix` never deletes anything. `--report` replaces your home folder with `~` and leaves out usernames, hostnames, IPs, tokens and environment values.
 
 It reports chip, memory, cores, macOS version, the Hugging Face cache (`$HF_HOME` or `~/.cache/huggingface`) and its size, free disk, whether `mlx-lm` is installed in `~/.local/mlx-server`, every model folder in the cache, and a recommendation by memory tier. Its tiers match `setup.sh`.
 

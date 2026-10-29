@@ -149,4 +149,4 @@ The server got something that is not a JSON object, for example from a hand-writ
 
 ## Still stuck
 
-Open an [issue](https://github.com/nicedreamzapp/claude-code-local/issues/new/choose) with your chip, memory, macOS version, the model, the output of `bash scripts/doctor.sh`, and the last lines of the server log ([CONTRIBUTING.md](https://github.com/nicedreamzapp/claude-code-local/blob/main/CONTRIBUTING.md)).
+Open an [issue](https://github.com/nicedreamzapp/claude-code-local/issues/new/choose) with your chip, memory, macOS version, the model, the block from `bash scripts/doctor.sh --report`, and the last lines of the server log ([CONTRIBUTING.md](https://github.com/nicedreamzapp/claude-code-local/blob/main/CONTRIBUTING.md)).
