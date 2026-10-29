@@ -222,6 +222,16 @@ irm https://raw.githubusercontent.com/nicedreamzapp/claude-code-local/main/insta
 You need **git**, **Python 3**, and **Claude Code** installed. When it finishes, run **`claude-local`**
 (Linux) or double-click **Claude Local** on your Desktop (Windows).
 
+On Windows the installer then offers the add-ons that run there, each installed by its own repo's
+installer: **moonstone** ([Moonstone](https://github.com/nicedreamzapp/moonstone)), **browser**
+([browser-broker](https://github.com/nicedreamzapp/browser-agent)), **remote**
+([FiaOS](https://github.com/nicedreamzapp/FiaOS)) and **terminal**
+([Trinidad Head](https://github.com/nicedreamzapp/trinidad-head)). To skip the menu, set
+`$env:CCL_WITH = "all"` (or `"moonstone,terminal"`, or `"none"`) before the one-liner. Uninstall
+(set `$env:CCL_WITH = "all"` first to remove the add-ons too; models and user data are kept unless
+`$env:CCL_PURGE = "1"`):
+`irm https://raw.githubusercontent.com/nicedreamzapp/claude-code-local/main/uninstall.ps1 | iex`
+
 It picks the strongest vision model that fits and tells you why, for example:
 
 | Your hardware | What you get |
