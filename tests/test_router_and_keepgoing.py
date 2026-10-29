@@ -154,11 +154,11 @@ def test_main_menu_prints_the_choice(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.setattr(keepgoing, "running_local_model", lambda: None)
-    monkeypatch.setattr(keepgoing, "mac_ram_gb", lambda: 16)  # Gemma 4 E4B and Hermes 4 14B fit
+    monkeypatch.setattr(keepgoing, "mac_ram_gb", lambda: 16)  # Qwen 3.5 2B and Qwen 3.5 4B fit
     monkeypatch.setattr("builtins.input", lambda: "2")
     keepgoing.main()
     out = capsys.readouterr()
-    assert out.out == "sess1\tlocal\tdivinetribe/Hermes-4-14B-abliterated-4bit-mlx\t0\n"
+    assert out.out == "sess1\tlocal\tmlx-community/Qwen3.5-4B-bf16\t0\n"
     assert "Gemma 4 12B" not in out.err
 
 
@@ -241,7 +241,7 @@ def test_main_auto_without_key_goes_local(tmp_path, monkeypatch, capsys):
     auto_setup(tmp_path, monkeypatch, "", ["big:free"], None, 16)
     keepgoing.main(["--auto"])
     out = capsys.readouterr()
-    assert out.out == "s\tlocal\tdivinetribe/Hermes-4-14B-abliterated-4bit-mlx\t0\n"
+    assert out.out == "s\tlocal\tmlx-community/Qwen3.5-4B-bf16\t0\n"
     assert "Pick a model" not in out.err
 
 
@@ -257,4 +257,4 @@ def test_main_without_auto_still_shows_the_menu(tmp_path, monkeypatch, capsys):
     keepgoing.main([])
     out = capsys.readouterr()
     assert "Pick a model" in out.err
-    assert out.out == "s\tlocal\tmlx-community/gemma-4-e4b-it-4bit\t0\n"
+    assert out.out == "s\tlocal\tmlx-community/Qwen3.5-2B-MLX-8bit\t0\n"

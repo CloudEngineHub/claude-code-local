@@ -32,8 +32,8 @@ C = dict(dim="\033[2m", b="\033[1m", grn="\033[32m", ylw="\033[33m", red="\033[3
 # The lineup setup.sh installs from (see README "Pick your fighter"), smallest first.
 # (Hugging Face id, label, minimum Mac RAM in GB)
 LOCAL = [
-    ("mlx-community/gemma-4-e4b-it-4bit", "Gemma 4 E4B", 8),
-    ("divinetribe/Hermes-4-14B-abliterated-4bit-mlx", "Hermes 4 14B", 16),
+    ("mlx-community/Qwen3.5-2B-MLX-8bit", "Qwen 3.5 2B", 8),
+    ("mlx-community/Qwen3.5-4B-bf16", "Qwen 3.5 4B", 16),
     ("divinetribe/gemma-4-12B-it-abliterated-4bit-mlx-text", "Gemma 4 12B", 32),
     ("divinetribe/gemma-4-31b-it-abliterated-4bit-mlx", "Gemma 4 31B", 64),
     ("lmstudio-community/Qwen3.8-27B-MLX-8bit", "Qwen 3.8 27B", 96),
