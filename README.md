@@ -146,6 +146,28 @@ bash setup.sh
 Setup picks your model, downloads it, installs the server, and puts **`Claude Local.command`** on
 your Desktop. **Double-click it** and you're coding locally. 🎉
 
+### 🧰 The full kit
+
+The local model is the brain. The add-ons give it ears, a voice, hands and reach, and one command
+installs all of it:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nicedreamzapp/claude-code-local/main/install.sh | bash -s -- --with all
+```
+
+| Add-on | What it gives you | Mac | Windows |
+|---|---|:---:|:---:|
+| `voice` | [NarrateClaude](https://github.com/nicedreamzapp/NarrateClaude): talk to Claude Code and hear it answer | ✅ | |
+| `moonstone` | [Moonstone](https://github.com/nicedreamzapp/moonstone): every session on every machine in one window, push to talk | ✅ | ✅ |
+| `browser` | [browser-agent](https://github.com/nicedreamzapp/browser-agent): agents use your real, logged in browser, each in its own tab | ✅ | ✅ |
+| `phone` | [claude-screen-to-phone](https://github.com/nicedreamzapp/claude-screen-to-phone): drive Claude Code from your iPhone over iMessage | ✅ | |
+| `remote` | [FiaOS](https://github.com/nicedreamzapp/FiaOS): your screen and a real terminal from any browser | ✅ | ✅ |
+| `failover` | [claude-failover](https://github.com/nicedreamzapp/claude-failover): background agents keep working on the local model when you hit your Claude limit | ✅ | |
+| `terminal` | [Trinidad Head](https://github.com/nicedreamzapp/trinidad-head): a glowing terminal with a color per window | | ✅ |
+
+Every piece is its own repo with its own one-line installer and uninstaller, so you can take one
+and leave the rest.
+
 **Add-ons (macOS).** After the model is set up, setup offers a menu of add-ons. Each is its own repo,
 installed by that repo's own one-line installer: `voice` ([NarrateClaude](https://github.com/nicedreamzapp/NarrateClaude)),
 `browser` ([browser-agent](https://github.com/nicedreamzapp/browser-agent)), `phone` ([claude-screen-to-phone](https://github.com/nicedreamzapp/claude-screen-to-phone)),
