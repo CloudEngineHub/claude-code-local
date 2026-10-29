@@ -412,11 +412,11 @@ mac_verdict() {
   local mem="$1"
   head_ "🎯 Verdict: what to actually run"
   if [ "$mem" -lt 16 ]; then
-    info "${mem} GB → Gemma 4 E4B (4-bit, ~5 GB) is what fits. Tool calls are unreliable at this size; 16 GB+ is where it gets good."
-    RECOMMENDED="mlx-community/gemma-4-e4b-it-4bit"; EXPECTED_TPS="?"
+    info "${mem} GB → small-Mac tier 8gb: Qwen 3.5 2B (8-bit, ~2.7 GB, sees images), 16K context (docs/SMALL-MACS.md)."
+    RECOMMENDED="mlx-community/Qwen3.5-2B-MLX-8bit"; EXPECTED_TPS="~60"
   elif [ "$mem" -lt 32 ]; then
-    info "${mem} GB → Hermes 4 14B (4-bit, ~8 GB). Confirmed working on a 16 GB Mac (issue #54)."
-    RECOMMENDED="divinetribe/Hermes-4-14B-abliterated-4bit-mlx"; EXPECTED_TPS="?"
+    info "${mem} GB → small-Mac tier 16gb: Qwen 3.5 4B (bf16, ~9 GB, sees images), 16K context (docs/SMALL-MACS.md). Hermes 4 14B 4-bit (text only, issue #54) also fits."
+    RECOMMENDED="mlx-community/Qwen3.5-4B-bf16"; EXPECTED_TPS="~20"
   elif [ "$mem" -lt 64 ]; then
     info "${mem} GB → Gemma 4 12B (4-bit, ~11 GB). With 48 GB you can also run Gemma 4 31B 4-bit (~18 GB) if you close other apps."
     RECOMMENDED="divinetribe/gemma-4-12B-it-abliterated-4bit-mlx-text"; EXPECTED_TPS="?"

@@ -37,7 +37,10 @@ def test_import_time_defaults():
 
 @pytest.mark.parametrize("text,expected", [
     ("<think>plan</think>Answer", "Answer"),
-    ("stray</think>Answer", "strayAnswer"),
+    # The template opened <think> in the prompt (Qwen 3.5): the text before the
+    # lone close is reasoning, not part of the answer.
+    ("stray</think>Answer", "Answer"),
+    ("I should fix it.\n</think>\n\nFixed.", "Fixed."),
     ("<|channel>thought\nhmm<channel|>Answer", "Answer"),
     ("Answer<tool_call>  </tool_call>", "Answer"),
     ("<think>only thinking</think>", "<think>only thinking</think>"),

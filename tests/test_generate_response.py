@@ -55,7 +55,7 @@ def test_code_mode_swaps_system_prompt_before_templating(fake_model):
     fake_model.outputs = ["ok"]
     server.generate_response(body(system="HUGE HARNESS PROMPT", tools=[BASH]))
     messages, kw = server.tokenizer.calls[0]
-    assert messages[0] == {"role": "system", "content": server.CODE_SYSTEM_PROMPT}
+    assert messages[0] == {"role": "system", "content": server.code_system_prompt({"Bash"})}
     assert kw["tools"][0]["function"]["name"] == "Bash"
 
 

@@ -22,7 +22,7 @@ Claude Code needs a model name it recognizes. The server ignores it when choosin
 
 ## Which Mac do I need?
 
-Any Apple Silicon Mac (M1 or newer). Memory decides the model: `setup.sh` gives 16 GB Macs Hermes 4 14B, 32 GB Gemma 4 12B, 64 GB Gemma 4 31B and 96 GB or more Qwen 3.8 27B. Under 16 GB you get Gemma 4 E4B, which the repo reports as unreliable with tools. Run `bash scripts/doctor.sh` to see what fits. The maintainer has asked for reports from 8 GB and 16 GB Macs in [#57](https://github.com/nicedreamzapp/claude-code-local/issues/57).
+Any Apple Silicon Mac (M1 or newer). Memory decides the model: `setup.sh` gives 8 GB Macs Qwen 3.5 2B (8-bit) and 16 to 31 GB Macs Qwen 3.5 4B (bf16), both able to read images (see [Small Macs](SMALL-MACS.md)), 32 GB Gemma 4 12B, 64 GB Gemma 4 31B and 96 GB or more Qwen 3.8 27B. Run `bash scripts/doctor.sh` to see what fits. The maintainer has asked for reports from 8 GB and 16 GB Macs in [#57](https://github.com/nicedreamzapp/claude-code-local/issues/57).
 
 ## Which model should I run?
 
@@ -61,7 +61,7 @@ Claude Code's MCP tools are passed to the model like any other tool. Code mode k
 
 ## Can it read images?
 
-Not through the server. Image and document blocks inside tool results are replaced with `[image omitted]`, and only text blocks of user messages are passed to the model. The repo's vision work (Muse-Glimmer, Nemotron Omni) runs through other tools such as [mlx-vlm](https://github.com/Blaizzy/mlx-vlm) and [nemotron-omni-mlx](https://github.com/nicedreamzapp/nemotron-omni-mlx).
+Yes, when two things are true: [mlx-vlm](https://github.com/Blaizzy/mlx-vlm) is installed in the server's Python, and the model's `config.json` has a `vision_config` (the small-Mac models do). The server then loads the model through mlx-vlm, and an image in the newest message (a Read on a `.png`, a pasted screenshot) goes to the model. Older images in the conversation become `[image omitted]`, so a long session does not re-encode every picture on every turn. `MLX_VISION=0` turns it off. Text-only models, or a server without mlx-vlm, keep the old behavior: images are replaced with `[image omitted]`. Documents (PDF blocks) are always replaced with a marker.
 
 ## What does "abliterated" mean?
 

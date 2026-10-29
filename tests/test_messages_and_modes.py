@@ -146,7 +146,8 @@ def test_code_session_detection():
 def test_optimize_for_code_replaces_prompt_and_filters_tools():
     body = {"system": "x" * 40000, "tools": [BASH, WEBFETCH]}
     out = optimize_for_code(copy.deepcopy(body))
-    assert out["system"] == server.CODE_SYSTEM_PROMPT
+    assert out["system"] == server.code_system_prompt({"Bash"})
+    assert "- Bash:" in out["system"] and "- Write:" not in out["system"]
     assert [t["name"] for t in out["tools"]] == ["Bash"]
     assert out["tools"][0]["description"] == "Bash"
 

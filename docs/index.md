@@ -59,10 +59,10 @@ There is no OpenAI-format server and no translation proxy in the middle: the ser
 | 96 GB and up | `lmstudio-community/Qwen3.8-27B-MLX-8bit` (Qwen 3.8 27B, 8-bit) | ~29 GB |
 | 64 to 95 GB | `divinetribe/gemma-4-31b-it-abliterated-4bit-mlx` (Gemma 4 31B, 4-bit) | ~18 GB |
 | 32 to 63 GB | `divinetribe/gemma-4-12B-it-abliterated-4bit-mlx-text` (Gemma 4 12B, 4-bit) | ~11 GB |
-| 16 to 31 GB | `divinetribe/Hermes-4-14B-abliterated-4bit-mlx` (Hermes 4 14B, 4-bit) | ~8 GB |
-| Under 16 GB | `mlx-community/gemma-4-e4b-it-4bit` (Gemma 4 E4B, 4-bit) | ~5 GB |
+| 16 to 31 GB | `mlx-community/Qwen3.5-4B-bf16` (Qwen 3.5 4B, bf16, reads images), 16K context | ~9 GB |
+| Under 16 GB | `mlx-community/Qwen3.5-2B-MLX-8bit` (Qwen 3.5 2B, 8-bit, reads images), 16K context | ~2.7 GB |
 
-Sizes are the labels printed by `setup.sh`. The repository notes that the under-16 GB model "claimed to run a file it never wrote" in a Claude Code smoke test on 2026-09-19, so expect unreliable tool calls on the smallest tier. A user confirmed Hermes 4 14B on a 16 GB Mac in [issue #54](https://github.com/nicedreamzapp/claude-code-local/issues/54).
+Sizes are the labels printed by `setup.sh`. The two small-Mac rows come from `scripts/mac-tier.sh`; measured memory, speed and test results are on the [Small Macs](SMALL-MACS.md) page. Hermes 4 14B (4-bit, text only), the earlier 16 GB pick that a user confirmed in [issue #54](https://github.com/nicedreamzapp/claude-code-local/issues/54), still works: `CCL_TIER=none MLX_MODEL=divinetribe/Hermes-4-14B-abliterated-4bit-mlx`.
 
 ## Measured results in the repo
 

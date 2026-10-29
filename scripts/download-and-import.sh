@@ -5,7 +5,8 @@
 #   bash scripts/download-and-import.sh                  # default Gemma 4 31B
 #   bash scripts/download-and-import.sh qwen             # Qwen 3.8 27B, 8-bit
 #   bash scripts/download-and-import.sh gemma12          # Gemma 4 12B
-#   bash scripts/download-and-import.sh hermes           # Hermes 4 14B (16 GB Macs)
+#   bash scripts/download-and-import.sh hermes           # Hermes 4 14B (text only, 4-bit)
+#   bash scripts/download-and-import.sh small            # small-Mac tier for this Mac (8/16 GB)
 #   bash scripts/download-and-import.sh llama            # Llama 3.3 70B (older, kept for existing users)
 #   MLX_MODEL=<hf-id> bash scripts/download-and-import.sh
 
@@ -32,6 +33,25 @@ case "${1:-}" in
   hermes|14b)
     MODEL="${MLX_MODEL:-divinetribe/Hermes-4-14B-abliterated-4bit-mlx}"
     LABEL="Hermes 4 14B Abliterated, 4-bit (~8 GB, 16 GB Macs)"
+    ;;
+  small|tier|small-mac)
+    # The small-Mac tier for this Mac (scripts/mac-tier.sh). Vision models, so
+    # they go to a flat folder with every file (processor configs included).
+    source "$(cd "$(dirname "$0")" && pwd)/mac-tier.sh"
+    if [ "$CCL_TIER" = "none" ]; then
+      echo "This Mac has 32 GB or more; no small-Mac tier. Force one: CCL_TIER=16gb $0 small"
+      exit 1
+    fi
+    echo "=== Downloading $CCL_MODEL_LABEL ($CCL_TIER tier) ==="
+    "$MLX_PYTHON" -c "import mlx_vlm" 2>/dev/null || "$MLX_PYTHON" -m pip install --quiet mlx-vlm
+    "$MLX_PYTHON" - <<PY
+from huggingface_hub import snapshot_download
+snapshot_download("$CCL_MODEL_ID", local_dir="$CCL_MODEL_DIR")
+print("Done.")
+PY
+    echo ""
+    echo "=== DONE! Double-click launchers/Small Mac.command"
+    exit 0
     ;;
   llama|llama70|70b)
     # Older model, no current measurements. Kept so existing setups keep working.

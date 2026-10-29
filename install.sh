@@ -53,8 +53,8 @@ if [ "$OS" = "Darwin" ]; then
   echo "  Memory: ${MEM_GB} GB"
   echo ""
   if [ "$MEM_GB" -lt 16 ]; then
-    echo "  ⚠️  Under 16 GB. setup.sh will pick a small 4B model — it works,"
-    echo "      but tool calling will be noticeably less reliable."
+    echo "  ⚠️  Under 16 GB. setup.sh will pick Qwen 3.5 2B (8-bit, reads images, 16K context)."
+    echo "      Single reads, edits and commands work; keep tasks small (docs/SMALL-MACS.md)."
     echo ""
   fi
 elif [ "$OS" = "Linux" ]; then

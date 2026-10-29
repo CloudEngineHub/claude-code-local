@@ -45,6 +45,17 @@ try:
 except ImportError:
     MLX_AVAILABLE = False
 
+# mlx-vlm is optional. With it installed, a model that ships a vision tower
+# (Qwen 3.5, Gemma 4 E2B/E4B, ...) is loaded whole, and images Claude Code
+# sends (a Read on a .png, a pasted screenshot) reach the model instead of
+# being replaced with a marker. Without it, nothing changes.
+try:
+    from mlx_vlm import load as vlm_load
+    from mlx_vlm import stream_generate as vlm_stream_generate
+    VLM_AVAILABLE = True
+except Exception:
+    VLM_AVAILABLE = False
+
 # ─── Configuration ───────────────────────────────────────────────────────────
 
 def env_int(name, default):
@@ -101,11 +112,27 @@ BROWSER_MODE = os.environ.get("MLX_BROWSER_MODE", "0") == "1"
 # Code mode: auto-detect Claude Code coding sessions and replace the huge harness
 # system prompt with a Llama-tuned one. Set MLX_CODE_MODE=0 to disable.
 CODE_MODE_ENABLED = os.environ.get("MLX_CODE_MODE", "1") != "0"
+# Vision: "auto" (default) turns it on when mlx-vlm is installed AND the model's
+# config.json has a vision_config. "1" requires it, "0" keeps the text-only path.
+VISION_SETTING = (os.environ.get("MLX_VISION") or "auto").strip().lower()
+# Hard ceiling on prompt tokens. A request over it gets the same 400 the real
+# API sends for an over-long prompt, so Claude Code compacts instead of the
+# server allocating KV cache the Mac does not have. 0 = no ceiling. In our
+# runs that 400 is what triggered compaction: Claude Code 2.1 did not compact
+# on its own first, even with CLAUDE_CODE_AUTO_COMPACT_WINDOW set to the same
+# number (scripts/mac-tier.sh sets both).
+MAX_CONTEXT = env_int("MLX_MAX_CONTEXT", 0)
+# Longest side, in pixels, an image is shrunk to before the vision tower sees
+# it. A 1568x980 screenshot raised the server's peak by about 0.4 GB on
+# Qwen 3.5 2B bf16; fewer pixels is fewer patches to encode. 0 = send as is.
+MAX_IMAGE_SIDE = env_int("MLX_MAX_IMAGE_SIDE", 0)
 
 # ─── Globals ─────────────────────────────────────────────────────────────────
 
 model = None
 tokenizer = None
+processor = None      # mlx-vlm processor; set only when VISION is on
+VISION = False        # True once a vision model is loaded through mlx-vlm
 generate_lock = threading.Lock()
 # Prompt cache: reuse KV state across requests to avoid re-prefilling system+tools
 _prompt_cache = None
@@ -184,13 +211,56 @@ def release_transients(tag=""):
     mx.reset_peak_memory()
 
 
+def model_config(path):
+    """The model's config.json as a dict, from a local folder or the HF cache.
+    Returns {} when it cannot be read (no network, private repo, ...)."""
+    try:
+        if os.path.isdir(path):
+            cfg = os.path.join(path, "config.json")
+        else:
+            from huggingface_hub import hf_hub_download
+            cfg = hf_hub_download(path, "config.json")
+        with open(cfg) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def wants_vision(setting, config, vlm_available):
+    """Decide whether to load through mlx-vlm. Pure, so it is unit-tested.
+
+    "0"/"off" never; "1"/"on" whenever mlx-vlm is there (load fails loudly if
+    the model has no vision tower); "auto" only when both mlx-vlm is installed
+    and config.json declares a vision tower.
+    """
+    if setting in ("0", "off", "false", "no"):
+        return False
+    if not vlm_available:
+        return False
+    if setting in ("1", "on", "true", "yes"):
+        return True
+    return bool(config.get("vision_config"))
+
+
 def load_model():
-    global model, tokenizer, KV_BITS
+    global model, tokenizer, processor, VISION, KV_BITS
     if MEM_CACHE_LIMIT_GB > 0:
         mx.set_cache_limit(int(MEM_CACHE_LIMIT_GB * GB))
         log(f"MLX buffer cache capped at {MEM_CACHE_LIMIT_GB:g}GB")
     log(f"Loading model: {MODEL_PATH}")
     t0 = time.time()
+    if wants_vision(VISION_SETTING, model_config(MODEL_PATH), VLM_AVAILABLE):
+        # One copy of the weights serves both text and image turns.
+        model, processor = vlm_load(MODEL_PATH)
+        tokenizer = processor.tokenizer if hasattr(processor, "tokenizer") else processor
+        VISION = True
+        mx.eval(model.parameters())
+        log(f"Vision on (mlx-vlm): images in the newest message reach the model")
+        log(f"Model loaded in {time.time() - t0:.1f}s")
+        return
+    if VISION_SETTING in ("1", "on", "true", "yes") and not VLM_AVAILABLE:
+        log("MLX_VISION=1 but mlx-vlm is not installed (pip install mlx-vlm); "
+            "loading text-only")
     model, tokenizer = load(MODEL_PATH)
     mx.eval(model.parameters())
     # Fallback chat template if model doesn't provide one (Llama 3.3 has its own)
@@ -238,7 +308,12 @@ def strip_think_tags(text):
     """Remove thinking blocks from model reasoning output."""
     # Standard <think>...</think>
     cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
-    cleaned = re.sub(r'</think>', '', cleaned).strip()
+    # A lone </think>: the chat template opened the block in the prompt
+    # (Qwen 3.5 ends its generation prompt with "<think>\n"), so the output
+    # starts mid-thought. Everything before the close is reasoning; it used to
+    # go out as the answer, followed by the real answer a second time.
+    if '</think>' in cleaned:
+        cleaned = cleaned.rsplit('</think>', 1)[1].strip()
     # Gemma 4 thinking: <|channel>thought\n...<channel|>
     cleaned = re.sub(r'<\|channel>thought\n.*?<channel\|>', '', cleaned, flags=re.DOTALL).strip()
     # Empty tool_call blocks
@@ -846,15 +921,91 @@ def parse_tool_calls(text):
 
 # ─── Anthropic Message Conversion ───────────────────────────────────────────
 
-def convert_messages(body):
+def image_source(block):
+    """An Anthropic image block as something mlx-vlm's load_image takes
+    (a data URI or a URL), or None if the block has no usable source."""
+    src = block.get("source") or {}
+    if src.get("type") == "base64" and src.get("data"):
+        return f"data:{src.get('media_type', 'image/png')};base64,{src['data']}"
+    if src.get("type") == "url" and src.get("url"):
+        return src["url"]
+    return None
+
+
+def _render_blocks(blocks, keep_images):
+    """tool_result / user content blocks → a string, or (vision) a content list.
+
+    Images only survive when keep_images is True: the newest message of the
+    request. Older images become a marker, so a long session does not re-encode
+    every screenshot it ever saw on every turn (and the model already answered
+    about them in its own words).
+    """
+    items = []
+    for b in blocks:
+        if not isinstance(b, dict):
+            items.append({"type": "text", "text": str(b)})
+            continue
+        bt = b.get("type")
+        if bt == "image":
+            uri = image_source(b) if keep_images else None
+            if uri:
+                items.append({"type": "image", "image": uri})
+            else:
+                items.append({"type": "text", "text": "[image omitted]"})
+        elif bt == "document":
+            items.append({"type": "text", "text": "[document omitted]"})
+        else:
+            items.append({"type": "text", "text": b.get("text", str(b))})
+    if not any(i["type"] == "image" for i in items):
+        return "\n".join(i["text"] for i in items)
+    return items
+
+
+def shrink_image(source, max_side):
+    """A data URI shrunk so its longest side is at most max_side, as a PIL
+    image (mlx-vlm's load_image takes one). URLs and images already small
+    enough are returned unchanged."""
+    if not max_side or not isinstance(source, str) or not source.startswith("data:"):
+        return source
+    try:
+        import base64
+        import io
+        from PIL import Image
+        img = Image.open(io.BytesIO(base64.b64decode(source.split(",", 1)[1])))
+        if max(img.size) <= max_side:
+            return source
+        img = img.convert("RGB")
+        img.thumbnail((max_side, max_side))
+        return img
+    except Exception as e:
+        log(f"  Could not shrink image ({e}); sending it as is")
+        return source
+
+
+def collect_images(messages):
+    """Image sources in prompt order, from messages built by
+    convert_messages(..., vision=True)."""
+    out = []
+    for m in messages:
+        c = m.get("content")
+        if isinstance(c, list):
+            out.extend(i["image"] for i in c if i.get("type") == "image")
+    return out
+
+
+def convert_messages(body, vision=False):
     """Convert Anthropic Messages format to MLX chat messages.
 
     Handles:
     - Text messages (passthrough)
     - Assistant messages with tool_use blocks → <tool_call> format
     - User messages with tool_result blocks → role="tool" messages
+    - vision=True: images in the newest message become {"type": "image"}
+      content items (see collect_images); everywhere else, and with
+      vision=False, an image becomes a short "[image omitted]" marker
     """
     messages = []
+    body_messages = body.get("messages", [])
 
     # System prompt
     if body.get("system"):
@@ -864,9 +1015,10 @@ def convert_messages(body):
         messages.append({"role": "system", "content": sys_text})
 
     # Conversation messages
-    for msg in body.get("messages", []):
+    for msg_index, msg in enumerate(body_messages):
         role = msg.get("role", "user")
         content = msg.get("content", "")
+        keep_images = vision and msg_index == len(body_messages) - 1
 
         # Simple string content
         if isinstance(content, str):
@@ -879,10 +1031,14 @@ def convert_messages(body):
             tool_use_parts = []
             tool_result_parts = []
 
+            image_parts = []
+
             for block in content:
                 btype = block.get("type", "")
                 if btype == "text":
                     text_parts.append(block.get("text", ""))
+                elif btype == "image" and role == "user":
+                    image_parts.append(block)
                 elif btype == "tool_use":
                     tool_use_parts.append(block)
                 elif btype == "tool_result":
@@ -915,21 +1071,27 @@ def convert_messages(body):
                     if isinstance(result_content, list):
                         # An image (e.g. Read on a .png) used to fall through to
                         # str(b) and land in the prompt as base64 text, which can
-                        # be hundreds of thousands of tokens. Leave a marker.
-                        result_content = "\n".join(
-                            f"[{b.get('type')} omitted]" if b.get("type") in ("image", "document")
-                            else b.get("text", str(b))
-                            for b in result_content
-                        )
+                        # be hundreds of thousands of tokens. Without vision it
+                        # is a marker; with vision it is a real image item.
+                        result_content = _render_blocks(result_content, keep_images)
                     elif not isinstance(result_content, str):
                         result_content = str(result_content)
                     if tr.get("is_error"):
-                        result_content = "Error: " + result_content
+                        if isinstance(result_content, list):
+                            result_content = [{"type": "text", "text": "Error: "}] + result_content
+                        else:
+                            result_content = "Error: " + result_content
                     # Include tool name context if we can find it
                     messages.append({"role": "tool", "content": result_content})
 
-            # Regular message with just text
+            # Regular message: text, plus any images the user pasted
             else:
+                if image_parts:
+                    rendered = _render_blocks(image_parts + [
+                        {"type": "text", "text": p} for p in text_parts if p], keep_images)
+                    if rendered:
+                        messages.append({"role": role, "content": rendered})
+                    continue
                 text = "\n".join(p for p in text_parts if p)
                 if text.strip():
                     messages.append({"role": role, "content": text})
@@ -937,8 +1099,42 @@ def convert_messages(body):
     return messages
 
 
+def template_extras():
+    """Extra chat-template variables. Vision models here are Qwen 3.5-style
+    thinkers; with MLX_SUPPRESS_THINKING (the default) their template is told
+    enable_thinking=False so a small Mac does not spend its tokens on a
+    reasoning chain before every tool call. Templates that do not use the
+    variable ignore it."""
+    return {"enable_thinking": False} if (VISION and SUPPRESS_THINKING) else {}
+
+
+def render_prompt(messages, tools=None):
+    """The chat template as text (vision path: mlx-vlm tokenizes it itself so it
+    can expand each image placeholder into that image's patch tokens)."""
+    extras = template_extras()
+    try:
+        return tokenizer.apply_chat_template(
+            messages, tools=tools, add_generation_prompt=True, tokenize=False, **extras)
+    except Exception as e:
+        if not tools:
+            raise
+        log(f"  Chat template tools param failed ({e}), injecting into system prompt")
+        msg_copy = [m.copy() for m in messages]
+        tool_text = format_tools_as_text(tools)
+        if msg_copy and msg_copy[0]["role"] == "system":
+            msg_copy[0]["content"] = msg_copy[0]["content"] + "\n\n" + tool_text
+        else:
+            msg_copy.insert(0, {"role": "system", "content": tool_text})
+        return tokenizer.apply_chat_template(
+            msg_copy, add_generation_prompt=True, tokenize=False, **extras)
+
+
 def tokenize_messages(messages, tools=None):
     """Apply chat template and tokenize, with optional tool definitions."""
+    if VISION:
+        # Text tokens only; each image counts as its placeholder here. Used for
+        # logs, count_tokens and the MLX_MAX_CONTEXT check.
+        return tokenizer.encode(render_prompt(messages, tools), add_special_tokens=False)
     kwargs = {
         "add_generation_prompt": True,
         "tokenize": True,
@@ -1111,16 +1307,135 @@ def slim_tool(tool):
     return {"name": tool["name"], "description": tool["name"], "input_schema": slim_schema}
 
 
+_CWD_RE = re.compile(r"^\s*(?:-\s*)?(?:Primary working directory|Working directory|cwd)\s*:\s*(\S.*?)\s*$",
+                     re.IGNORECASE | re.MULTILINE)
+
+
+def working_directory(system):
+    """The working directory Claude Code states in its own system prompt, or None."""
+    if isinstance(system, list):
+        system = "\n".join(b.get("text", "") for b in system if isinstance(b, dict))
+    m = _CWD_RE.search(system or "")
+    return m.group(1) if m else None
+
+
+# Claude Code's /compact and auto-compact request: the whole conversation plus
+# this instruction as the last user message (text from Claude Code 2.1.x).
+COMPACT_MARKERS = (
+    "Your task is to create a detailed summary of the conversation so far",
+    "CRITICAL: Respond with TEXT ONLY. Do NOT call any tools.",
+)
+COMPACT_SYSTEM_PROMPT = (
+    "You summarize a coding session so it can continue in a fresh context. "
+    "Answer in plain text only. Never call a tool, never write a tool call.")
+
+
+def looks_like_compaction(body):
+    msgs = body.get("messages") or []
+    if not msgs:
+        return False
+    content = msgs[-1].get("content")
+    if isinstance(content, list):
+        content = "\n".join(b.get("text", "") for b in content
+                            if isinstance(b, dict) and b.get("type") == "text")
+    return isinstance(content, str) and any(m in content for m in COMPACT_MARKERS)
+
+
+def optimize_for_compaction(body):
+    """A compaction request gets a short system prompt and no tools.
+
+    Through code mode it kept the tools and lost Claude Code's instruction
+    framing, so a small model answered the "summarize" request with a Read
+    call, and Claude Code failed the compaction ("summarization produced
+    empty response") with the context already full."""
+    body = dict(body)
+    body["system"] = COMPACT_SYSTEM_PROMPT
+    body["tools"] = []
+    return body
+
+
+def fit_compaction(messages, count, limit):
+    """Make a compaction request fit under limit. Drop the oldest turns first,
+    then cut the biggest remaining text in the middle. The system prompt, the
+    first user message, the last message and the summarize instruction itself
+    are always kept.
+    A summary of most of the session beats a 400 that leaves it stuck full."""
+    def protected(i, m):
+        c = m.get("content")
+        return (m.get("role") == "system" or i == first or i == len(msgs) - 1
+                or (isinstance(c, str) and any(k in c for k in COMPACT_MARKERS)))
+
+    msgs = list(messages)
+    first = next((i for i, m in enumerate(msgs) if m.get("role") != "system"), 0)
+    n = count(msgs)
+    while n > limit:
+        drop = next((i for i, m in enumerate(msgs) if not protected(i, m)), None)
+        if drop is None:
+            break
+        del msgs[drop]
+        n = count(msgs)
+    # Still over: a protected message is too big on its own (Claude Code can
+    # send a whole file read in the same message as the instruction, or as the
+    # first message after an earlier compaction). Cut the biggest text in the
+    # middle, never the instruction.
+    while n > limit:
+        sizes = [(len(m["content"]), i) for i, m in enumerate(msgs)
+                 if isinstance(m.get("content"), str) and m.get("role") != "system"
+                 and not any(k in m["content"] for k in COMPACT_MARKERS)
+                 and not (i == len(msgs) - 1 and m.get("role") == "user")]
+        if not sizes or max(sizes)[0] < 200:
+            break
+        size, i = max(sizes)
+        keep = size // 4
+        c = msgs[i]["content"]
+        msgs[i] = dict(msgs[i], content=c[:keep] + "\n[... middle cut to fit the context ...]\n" + c[-keep:])
+        n = count(msgs)
+    return msgs, n
+
+
+def code_system_prompt(tool_names=None, cwd=None):
+    """CODE_SYSTEM_PROMPT, listing only the tools this request really offers
+    (claude --bare sends Bash, Edit and Read; a small model told Write exists
+    calls it and burns a turn on "No such tool"), plus the working directory."""
+    prompt = CODE_SYSTEM_PROMPT
+    if tool_names:
+        lines = []
+        for line in prompt.split("\n"):
+            m = re.match(r"- (\w+): ", line)
+            if m and m.group(1) in CODE_TOOLS_ALLOW and m.group(1) not in tool_names:
+                continue
+            lines.append(line)
+        prompt = "\n".join(lines)
+    if VISION and (not tool_names or "Read" in tool_names):
+        # Without this a small model treats an image as binary and pokes at it
+        # with `file` and PIL pixel dumps instead of just looking at it.
+        prompt = prompt.replace(
+            "- Read: read a file from disk (use absolute paths)",
+            "- Read: read a file from disk (use absolute paths). Read also opens images "
+            "(.png, .jpg, .gif, .webp) and you see the picture itself: to look at an "
+            "image, Read it")
+    if cwd:
+        prompt += (f"\n\nWorking directory: {cwd}\nRelative paths are relative to it; "
+                   f"absolute paths for files here start with {cwd.rstrip('/')}/")
+    return prompt
+
+
 def optimize_for_code(body):
     """Strip Claude Code bloat: replace the 10K-token harness prompt with a
-    compact coding prompt and slim tool definitions to ~150 tokens total."""
-    body["system"] = CODE_SYSTEM_PROMPT
+    compact coding prompt and slim tool definitions to ~150 tokens total.
 
+    The one line kept from the original is the working directory. Without it
+    the prompt says "use absolute paths" and gives none, and a small model
+    invents one (/Users/username/fizz.py) and writes the file somewhere else.
+    """
+    cwd = working_directory(body.get("system"))
     tools = body.get("tools", [])
     code_tools = [slim_tool(t) for t in tools if t.get("name", "") in CODE_TOOLS_ALLOW]
+    body["system"] = code_system_prompt({t["name"] for t in code_tools}, cwd)
     if code_tools:
         stripped = len(tools) - len(code_tools)
         body["tools"] = code_tools
+        log(f"  Code mode: working directory {cwd or 'not stated'}")
         log(f"  Code mode: {len(tools)} tools → {len(code_tools)} (stripped {stripped}, descriptions slimmed)")
 
     return body
@@ -1139,6 +1454,75 @@ TOOL_INTENT_PHRASES = [
     "<tool_call>", "<function=", "<tools>", '"name":', '"arguments":',
     '"parameters":', "```json", "```tool",
 ]
+
+
+def coerce_args(args, props):
+    """Fix argument types against the tool's schema.
+
+    The XML tool-call format (<parameter=x>value</parameter>, Qwen 3.5 and
+    Qwen Coder) carries every value as text, so a boolean arrives as "True"
+    and Claude Code rejects the whole call ("expected boolean, provided as
+    string"). Only plain string values whose schema type is not string are
+    touched; anything that does not convert cleanly is left as it was.
+    """
+    out = {}
+    for k, v in args.items():
+        t = (props.get(k) or {}).get("type") if isinstance(props.get(k), dict) else None
+        if isinstance(v, str) and t and t != "string":
+            sv = v.strip()
+            try:
+                if t == "boolean" and sv.lower() in ("true", "false"):
+                    v = sv.lower() == "true"
+                elif t == "integer":
+                    v = int(sv)
+                elif t == "number":
+                    v = float(sv) if any(c in sv for c in ".eE") else int(sv)
+                elif t in ("array", "object"):
+                    decoded = json.loads(sv)
+                    if isinstance(decoded, list if t == "array" else dict):
+                        v = decoded
+            except ValueError:
+                pass
+        out[k] = v
+    return out
+
+
+PATH_KEYS = ("file_path", "path", "notebook_path")
+
+
+def repair_paths(args, cwd):
+    """Put back the leading "/" a small model drops from an absolute path.
+
+    Qwen 3.5 2B writes "private/tmp/proj/notes.txt" for
+    "/private/tmp/proj/notes.txt". Claude Code reads that as relative to the
+    working directory, the file is not there, and the model retries the same
+    call until it runs out of turns. Only a path that becomes one inside the
+    working directory once the slash is restored is touched.
+    """
+    if not cwd:
+        return args
+    root = cwd.rstrip("/") + "/"
+    out = dict(args)
+    for k in PATH_KEYS:
+        v = out.get(k)
+        if isinstance(v, str) and v and not v.startswith(("/", "~", ".")) and ("/" + v).startswith(root):
+            out[k] = "/" + v
+            log(f"  {k} {v!r} was missing its leading slash -> {out[k]!r}")
+    return out
+
+
+def fix_bash_timeout(name, args):
+    """Bash's timeout is in milliseconds. Code mode slims away the description
+    that says so, and models write seconds ("timeout": 5), which Claude Code
+    runs as a 5 ms timeout: every command dies at once ("timed out after 0s")
+    and a small model retries the same call until max turns. Nobody means a
+    sub-second shell timeout, so a value under 1000 is read as seconds."""
+    t = args.get("timeout")
+    if name == "Bash" and isinstance(t, (int, float)) and not isinstance(t, bool) and 0 < t < 1000:
+        fixed = min(int(t * 1000), 600000)
+        log(f"  Bash timeout {t} read as seconds -> {fixed} ms")
+        return dict(args, timeout=fixed)
+    return args
 
 
 def assemble_anthropic_message(remaining_text, tool_calls, body, anthropic_tools,
@@ -1163,7 +1547,7 @@ def assemble_anthropic_message(remaining_text, tool_calls, body, anthropic_tools
         for atool in current_tools:
             schema = atool.get("input_schema") or {}
             props = schema.get("properties") or {}
-            tool_schemas[atool.get("name", "")] = set(props.keys())
+            tool_schemas[atool.get("name", "")] = props
         if os.environ.get("MLX_DEBUG_RESPONSE"):
             log(f"  TOOL SCHEMAS: {tool_schemas}")
 
@@ -1172,7 +1556,10 @@ def assemble_anthropic_message(remaining_text, tool_calls, body, anthropic_tools
             raw_input = tc["arguments"] if isinstance(tc.get("arguments"), dict) else {}
             allowed = tool_schemas.get(tc["name"])
             if allowed is not None:
-                filtered = {k: v for k, v in raw_input.items() if k in allowed}
+                filtered = coerce_args(
+                    {k: v for k, v in raw_input.items() if k in allowed}, allowed)
+                filtered = fix_bash_timeout(tc["name"], filtered)
+                filtered = repair_paths(filtered, working_directory(body.get("system")))
                 dropped = [k for k in raw_input if k not in allowed]
                 if dropped:
                     log(f"  Filtered extra input keys for {tc['name']}: {dropped}")
@@ -1214,7 +1601,18 @@ def count_prompt_tokens(body):
     """
     anthropic_tools = body.get("tools", [])
     llm_tools = convert_tools_for_llm(anthropic_tools) if anthropic_tools else None
-    return len(tokenize_messages(convert_messages(body), tools=llm_tools))
+    return len(tokenize_messages(convert_messages(body, vision=VISION), tools=llm_tools))
+
+
+class PromptTooLong(Exception):
+    """Prompt is over MLX_MAX_CONTEXT. Answered with the API's own 400 so
+    Claude Code treats it like any over-long prompt and compacts."""
+
+
+def check_context(prompt_tokens, limit=None):
+    limit = MAX_CONTEXT if limit is None else limit
+    if limit and prompt_tokens > limit:
+        raise PromptTooLong(f"prompt is too long: {prompt_tokens} tokens > {limit} maximum")
 
 
 def generate_response(body, on_start=None, on_text=None):
@@ -1228,7 +1626,11 @@ def generate_response(body, on_start=None, on_text=None):
 
     # In browser mode, strip Claude Code bloat before inference.
     # Otherwise, auto-detect Claude Code coding sessions and apply code mode.
-    if BROWSER_MODE:
+    compaction = looks_like_compaction(body)
+    if compaction:
+        body = optimize_for_compaction(body)
+        log("  Compaction request: text only, no tools")
+    elif BROWSER_MODE:
         body = optimize_for_browser(body)
     elif CODE_MODE_ENABLED and looks_like_code_session(body):
         body = optimize_for_code(body)
@@ -1273,25 +1675,52 @@ def generate_response(body, on_start=None, on_text=None):
     anthropic_tools = body.get("tools", [])
     llm_tools = convert_tools_for_llm(anthropic_tools) if anthropic_tools else None
 
-    messages = convert_messages(body)
+    messages = convert_messages(body, vision=VISION)
     max_tokens = body.get("max_tokens", DEFAULT_MAX_TOKENS)
     temperature = body.get("temperature", 0.2)
+    log(f"  Sampling: temperature {temperature}"
+        + ("" if "temperature" in body else " (server default; request set none)"))
 
     if llm_tools:
         log(f"  Tools: {len(llm_tools)} ({', '.join(t['function']['name'] for t in llm_tools[:5])}{'...' if len(llm_tools) > 5 else ''})")
 
     # Tokenize (with tools if present)
     token_ids = tokenize_messages(messages, tools=llm_tools)
+    if compaction and MAX_CONTEXT and len(token_ids) > MAX_CONTEXT:
+        before = len(messages)
+        messages, _ = fit_compaction(
+            messages, lambda m: len(tokenize_messages(m, tools=llm_tools)), MAX_CONTEXT)
+        token_ids = tokenize_messages(messages, tools=llm_tools)
+        log(f"  Compaction over MLX_MAX_CONTEXT: dropped {before - len(messages)} oldest "
+            f"messages to fit ({len(token_ids)} tokens)")
 
     # Pre-fill an empty thinking block so the model skips its reasoning chain entirely.
     # Gemma 4 generates 300-500 thinking tokens per request by default — this cuts them out.
+    thinking_prefill = ""
     if SUPPRESS_THINKING and "gemma" in MODEL_PATH.lower():
-        skip = tokenizer.encode("<|channel>thought\n<channel|>", add_special_tokens=False)
+        thinking_prefill = "<|channel>thought\n<channel|>"
+        skip = tokenizer.encode(thinking_prefill, add_special_tokens=False)
         token_ids = list(token_ids) + list(skip)
         log(f"  Thinking suppressed (+{len(skip)} prefill tokens)")
 
     prompt_tokens = len(token_ids)
     log(f"  Prompt: {prompt_tokens} tokens")
+    check_context(prompt_tokens)
+
+    def run_generation(msgs, prompt_ids, kwargs):
+        """One generation pass. Vision: mlx-vlm, whole prompt, images from the
+        newest message. Text: mlx-lm with the shared prompt cache."""
+        if VISION:
+            images = [shrink_image(i, MAX_IMAGE_SIDE) for i in collect_images(msgs)]
+            if images:
+                log(f"  Vision: {len(images)} image(s) in this turn"
+                    + (f", longest side capped at {MAX_IMAGE_SIDE}px" if MAX_IMAGE_SIDE else ""))
+            return vlm_stream_generate(
+                model, processor, render_prompt(msgs, llm_tools) + thinking_prefill,
+                image=images or None, max_tokens=max_tokens,
+                temperature=temperature, prefill_step_size=PREFILL_SIZE)
+        return stream_generate(model=model, tokenizer=tokenizer, prompt=prompt_ids,
+                               max_tokens=max_tokens, **kwargs)
 
     # ─── Prompt cache: reuse KV for shared prefix tokens ───
     global _prompt_cache, _cached_token_prefix
@@ -1299,7 +1728,8 @@ def generate_response(body, on_start=None, on_text=None):
     # Check if cache type supports safe trim+reuse (standard KVCache only,
     # RotatingKVCache from Gemma 4 has a circular buffer that breaks on trim+extend)
     from mlx_lm.models.cache import RotatingKVCache
-    cache_is_safe = _prompt_cache is not None and not isinstance(_prompt_cache[0], RotatingKVCache)
+    cache_is_safe = (not VISION and _prompt_cache is not None
+                     and not isinstance(_prompt_cache[0], RotatingKVCache))
 
     # Find how many leading tokens match the previous request's prompt
     cache_hit_len = 0
@@ -1338,7 +1768,9 @@ def generate_response(body, on_start=None, on_text=None):
         # Feed only the new tokens, with the existing cache
         prompt_for_gen = delta_tokens
     else:
-        if _prompt_cache is not None and isinstance(_prompt_cache[0], RotatingKVCache):
+        if VISION:
+            pass  # mlx-vlm prefills the whole prompt; see the VISION note below
+        elif _prompt_cache is not None and isinstance(_prompt_cache[0], RotatingKVCache):
             log(f"  RotatingKVCache: fresh cache each request (no trim support)")
         else:
             log(f"  Cache miss: full prefill of {prompt_tokens} tokens")
@@ -1346,7 +1778,12 @@ def generate_response(body, on_start=None, on_text=None):
         prompt_for_gen = token_ids
 
     # Build generation kwargs — always pass a prompt_cache so we can reuse it
-    if _prompt_cache is None:
+    if VISION:
+        # mlx-vlm builds its own cache per request. The models this path is for
+        # (Qwen 3.5) mix linear-attention layers into the stack, and that state
+        # cannot be trimmed back to a shared prefix anyway.
+        _prompt_cache = None
+    elif _prompt_cache is None:
         _prompt_cache = make_prompt_cache(model)
         log(f"  Created new prompt cache ({len(_prompt_cache)} layers)")
     gen_kwargs = {
@@ -1368,6 +1805,7 @@ def generate_response(body, on_start=None, on_text=None):
     tf = ThinkingFilter()
     full_text = ""
     gen_tokens = 0
+    last_response = None
     finish_reason = "end_turn"
     stop_sequences = [x for x in body.get("stop_sequences") or [] if isinstance(x, str) and x]
     stop_sequence = None
@@ -1383,18 +1821,13 @@ def generate_response(body, on_start=None, on_text=None):
 
     with generate_lock:
         try:
-            for response in stream_generate(
-                model=model,
-                tokenizer=tokenizer,
-                prompt=prompt_for_gen,
-                max_tokens=max_tokens,
-                **gen_kwargs,
-            ):
+            for response in run_generation(messages, prompt_for_gen, gen_kwargs):
                 chunk = tf.feed(response.text)
                 full_text += chunk
                 if on_text and chunk:
                     on_text(chunk)
                 gen_tokens = response.generation_tokens
+                last_response = response
                 if response.finish_reason == "length":
                     finish_reason = "max_tokens"
                 elif response.finish_reason == "stop":
@@ -1438,6 +1871,12 @@ def generate_response(body, on_start=None, on_text=None):
     elapsed = time.time() - t0
     tps = gen_tokens / elapsed if elapsed > 0 else 0
     log(f"  Generated: {gen_tokens} tokens in {elapsed:.1f}s ({tps:.1f} tok/s)")
+    # Both mlx-lm and mlx-vlm report prefill and decode speed separately; the
+    # line above blends them, which hides a slow prefill behind a fast decode.
+    p_tps = getattr(last_response, "prompt_tps", None)
+    g_tps = getattr(last_response, "generation_tps", None)
+    if isinstance(p_tps, (int, float)) and isinstance(g_tps, (int, float)):
+        log(f"  Speed: prefill {p_tps:.0f} tok/s, decode {g_tps:.1f} tok/s")
 
     # Clean output (preserves <tool_call> tags)
     text = clean_response(full_text)
@@ -1479,13 +1918,11 @@ def generate_response(body, on_start=None, on_text=None):
             # cache instead. The shared cache and its token prefix are left
             # exactly as the first attempt left them, so the next request
             # reuses the same KV state it always did.
-            retry_kwargs = dict(gen_kwargs, prompt_cache=make_prompt_cache(model))
+            retry_kwargs = (gen_kwargs if VISION
+                            else dict(gen_kwargs, prompt_cache=make_prompt_cache(model)))
             with generate_lock:
                 try:
-                    for response in stream_generate(
-                        model=model, tokenizer=tokenizer, prompt=retry_tokens,
-                        max_tokens=max_tokens, **retry_kwargs,
-                    ):
+                    for response in run_generation(retry_messages, retry_tokens, retry_kwargs):
                         retry_text += retry_tf.feed(response.text)
                         retry_gen = response.generation_tokens
                 finally:
@@ -1721,6 +2158,14 @@ def send_anthropic_stream_live(handler, body):
     except (BrokenPipeError, ConnectionResetError):
         log("  live stream: client disconnected mid-generation")
         return
+    except PromptTooLong as e:
+        log(f"  ← 400 {e}")
+        try:
+            emit("error", {"type": "error",
+                           "error": {"type": "invalid_request_error", "message": str(e)}})
+        except Exception:
+            pass
+        return
     except Exception as e:
         log(f"  live stream ERROR: {e}")
         import traceback
@@ -1852,6 +2297,10 @@ class AnthropicHandler(BaseHTTPRequestHandler):
                     send_anthropic_stream(self, result)
                 else:
                     send_json(self, 200, result)
+            except PromptTooLong as e:
+                log(f"  ← 400 {e}")
+                send_json(self, 400, {"type": "error", "error": {
+                    "type": "invalid_request_error", "message": str(e)}})
             except Exception as e:
                 log(f"  ← ERROR: {e}")
                 import traceback
@@ -1894,7 +2343,8 @@ class AnthropicHandler(BaseHTTPRequestHandler):
             # to the edge is this box?" without attaching to the process.
             # mx_peak_gb is the honest one; see mem_snapshot on why not rss.
             payload = {"status": "ok", "model": MODEL_PATH,
-                       "prefill_size": PREFILL_SIZE}
+                       "prefill_size": PREFILL_SIZE, "vision": VISION,
+                       "max_context": MAX_CONTEXT}
             payload.update(mem_snapshot())
             send_json(self, 200, payload)
         else:
@@ -1921,7 +2371,10 @@ if __name__ == "__main__":
     print(f"Prefill chunk: {PREFILL_SIZE} tokens"
           + (f" · MLX buffer cache capped at {MEM_CACHE_LIMIT_GB:g}GB" if MEM_CACHE_LIMIT_GB > 0 else ""))
     print(f"Memory now: {mem_snapshot()}")
-    print(f"Prompt cache: enabled (KV reuse across requests)")
+    print("Vision: on (mlx-vlm), images reach the model" if VISION
+          else "Prompt cache: enabled (KV reuse across requests)")
+    if MAX_CONTEXT:
+        print(f"Context ceiling: {MAX_CONTEXT} tokens (MLX_MAX_CONTEXT)")
     print(f"Tool retry: up to {MAX_TOOL_RETRIES} retries on garbled tool calls")
     print()
     print("Claude Code config:")

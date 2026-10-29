@@ -73,9 +73,20 @@ else
 fi
 
 # ── Pick a model from the lineup ──────────────────────────────
+# Under 32 GB the small-Mac tier decides (scripts/mac-tier.sh, measured in
+# docs/SMALL-MACS.md): a bf16 model that reads images, writes code and calls
+# tools, with the context capped to what the Mac can hold.
+REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+CCL_MEM_GB="${CCL_MEM_GB:-$MEM_GB}"
+source "$REPO_DIR/scripts/mac-tier.sh"
+
 echo ""
 echo "Selecting a model from the lineup for your ${MEM_GB} GB Mac..."
-if [ "$MEM_GB" -ge 96 ]; then
+if [ "$CCL_TIER" != "none" ]; then
+  MODEL_ID="$CCL_MODEL_ID"
+  MODEL_LABEL="$CCL_MODEL_LABEL, ${CCL_CONTEXT}-token context"
+  MODEL_TIER="🟡 small Mac ($CCL_TIER)"
+elif [ "$MEM_GB" -ge 96 ]; then
   # Passed a Claude Code smoke test on an M5 Max, 2026-09-19 (wrote hello.py, ran it, 38 s).
   MODEL_ID="lmstudio-community/Qwen3.8-27B-MLX-8bit"
   MODEL_LABEL="Qwen 3.8 27B, 8-bit (~29 GB)"
@@ -84,21 +95,13 @@ elif [ "$MEM_GB" -ge 64 ]; then
   MODEL_ID="divinetribe/gemma-4-31b-it-abliterated-4bit-mlx"
   MODEL_LABEL="Gemma 4 31B Abliterated, 4-bit (~18 GB)"
   MODEL_TIER="🟢 fast"
-elif [ "$MEM_GB" -ge 32 ]; then
+else
   MODEL_ID="divinetribe/gemma-4-12B-it-abliterated-4bit-mlx-text"
   MODEL_LABEL="Gemma 4 12B Abliterated, 4-bit (~11 GB)"
   MODEL_TIER="🟢 fast"
-elif [ "$MEM_GB" -ge 16 ]; then
-  MODEL_ID="divinetribe/Hermes-4-14B-abliterated-4bit-mlx"
-  MODEL_LABEL="Hermes 4 14B Abliterated, 4-bit (~8 GB)"
-  MODEL_TIER="🟡 laptop"
-else
-  # Loads and chats, but in a Claude Code smoke test (2026-09-19) it claimed to run a
-  # file it never wrote. Small Macs get it anyway; tool use will be unreliable.
-  MODEL_ID="mlx-community/gemma-4-e4b-it-4bit"
-  MODEL_LABEL="Gemma 4 E4B, 4-bit (~5 GB, may struggle with tool calls)"
-  MODEL_TIER="🟠 small"
 fi
+# Hermes 4 14B (4-bit, text only) was the 16 GB pick before the tier and still
+# works there: CCL_TIER=none MLX_MODEL=divinetribe/Hermes-4-14B-abliterated-4bit-mlx
 
 echo "Selected: $MODEL_TIER  $MODEL_LABEL"
 echo "Model ID: $MODEL_ID"
@@ -107,6 +110,17 @@ echo ""
 # ── Download model ────────────────────────────────────────────
 if [ "${CCL_SKIP_MODEL:-0}" = "1" ]; then
   echo "CCL_SKIP_MODEL=1: skipping the download of $MODEL_ID"
+elif [ "$CCL_TIER" != "none" ]; then
+  # The tier models are vision models: mlx-vlm loads them whole, and they go to
+  # a flat folder (the layout resolve_mlx_model and the launchers look for).
+  echo "Installing mlx-vlm (lets the model see images)..."
+  "$MLX_VENV/bin/pip" install --quiet --upgrade mlx-vlm
+  echo "Downloading $MODEL_ID to $CCL_MODEL_DIR (one time)..."
+  "$MLX_VENV/bin/python3" - <<PY
+from huggingface_hub import snapshot_download
+snapshot_download("$MODEL_ID", local_dir="$CCL_MODEL_DIR")
+print("Done.")
+PY
 else
   echo "Downloading $MODEL_ID (one time, 5-30 GB)..."
   "$MLX_VENV/bin/python3" - <<PY
@@ -139,6 +153,16 @@ fi
 
 mkdir -p "$HOME/Desktop"
 LAUNCHER="$HOME/Desktop/Claude Local.command"
+if [ "$CCL_TIER" != "none" ]; then
+  # Small Macs: the repo's own launcher, which re-reads the tier settings
+  # (model, context ceiling, compaction) every time it starts.
+  cat > "$LAUNCHER" <<LAUNCH
+#!/bin/bash
+# Claude Code — Local AI, small-Mac tier ($MODEL_LABEL)
+CCL_TIER="\${CCL_TIER:-$CCL_TIER}" CLAUDE_BIN="$CLAUDE_BIN" MLX_PYTHON="$MLX_VENV/bin/python3" MLX_SERVER="$SERVER_DIR/server.py" \\
+  exec "$SCRIPT_DIR/launchers/Small Mac.command"
+LAUNCH
+else
 cat > "$LAUNCHER" <<LAUNCH
 #!/bin/bash
 # Claude Code — Local AI ($MODEL_LABEL)
@@ -165,6 +189,7 @@ ANTHROPIC_BASE_URL=http://localhost:4000 \\
 ANTHROPIC_API_KEY=sk-local \\
 exec "\$CLAUDE_BIN" --model claude-sonnet-4-6
 LAUNCH
+fi
 
 chmod +x "$LAUNCHER"
 
