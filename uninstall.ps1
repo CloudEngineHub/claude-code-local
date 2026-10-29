@@ -7,7 +7,7 @@
 # llama.cpp and models in %LOCALAPPDATA%\claude-code-local (CCL_HOME) are kept unless -Purge.
 #
 # Add-ons: -With / $env:CCL_WITH takes the same names as install.ps1 (moonstone, browser, remote,
-# terminal, all). Each is removed by its own repo's uninstaller, which keeps that add-on's user
+# terminal, voice, all). Each is removed by its own repo's uninstaller, which keeps that add-on's user
 # data unless -Purge (or CCL_PURGE=1) is passed along. In an interactive console you are asked;
 # otherwise no add-ons are touched.
 
@@ -22,6 +22,7 @@ function Uninstall-ClaudeCodeLocal {
   $Raw = "https://raw.githubusercontent.com/nicedreamzapp"
   $broker = if ($env:BROWSER_BROKER_DIR) { $env:BROWSER_BROKER_DIR } else { Join-Path $env:USERPROFILE "browser-agent" }
   $moon = if ($env:MOONSTONE_DIR) { $env:MOONSTONE_DIR } else { Join-Path $env:USERPROFILE "moonstone" }
+  $narr = if ($env:NARRATE_DIR) { $env:NARRATE_DIR } else { Join-Path $env:USERPROFILE "NarrateClaude" }
   $fia = if ($env:FIAOS_DIR) { $env:FIAOS_DIR } else { Join-Path $env:USERPROFILE "FiaOS" }
   # Local uninstaller first (it matches what is installed), the repo's copy if that is gone.
   $AddOns = [ordered]@{
@@ -29,8 +30,9 @@ function Uninstall-ClaudeCodeLocal {
     browser   = @{ Name = "browser-broker"; Local = (Join-Path $broker "broker\windows\uninstall.ps1");     Url = $null }
     remote    = @{ Name = "FiaOS";          Local = (Join-Path $fia "windows\uninstall.ps1");              Url = "$Raw/FiaOS/main/windows/uninstall.ps1" }
     terminal  = @{ Name = "Trinidad Head";  Local = $null;                                                 Url = "$Raw/trinidad-head/main/uninstall.ps1" }
+    voice     = @{ Name = "NarrateClaude";  Local = (Join-Path $narr "uninstall.ps1");                     Url = "$Raw/NarrateClaude/main/uninstall.ps1" }
   }
-  $Alias = @{ fiaos = "remote"; broker = "browser"; "browser-broker" = "browser"; trinidad = "terminal"; "trinidad-head" = "terminal" }
+  $Alias = @{ fiaos = "remote"; broker = "browser"; "browser-broker" = "browser"; trinidad = "terminal"; "trinidad-head" = "terminal"; narrate = "voice"; narrateclaude = "voice" }
 
   function Test-Interactive {
     if ($env:CCL_NONINTERACTIVE -eq "1") { return $false }
@@ -58,7 +60,7 @@ function Uninstall-ClaudeCodeLocal {
   }
 
   if (-not $With -and (Test-Interactive)) {
-    $With = Read-Host "Also remove add-ons? (moonstone, browser, remote, terminal, all; Enter for none)"
+    $With = Read-Host "Also remove add-ons? (moonstone, browser, remote, terminal, voice, all; Enter for none)"
   }
   $keys = @($AddOns.Keys); $picked = @()
   foreach ($w in ($With -split '[,\s]+' | Where-Object { $_ })) {

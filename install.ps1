@@ -12,6 +12,7 @@
 #   browser    browser-broker, agents share your real browser safely    (github.com/nicedreamzapp/browser-agent)
 #   remote     FiaOS, your desktop and a terminal from any browser tab  (github.com/nicedreamzapp/FiaOS)
 #   terminal   Trinidad Head, the terminal for local models             (github.com/nicedreamzapp/trinidad-head)
+#   voice      NarrateClaude, talk to Claude Code and hear it answer    (github.com/nicedreamzapp/NarrateClaude)
 #
 # Pick add-ons without the menu (irm | iex can't take parameters, so use an env var):
 #   $env:CCL_WITH = "moonstone,terminal"; irm https://raw.githubusercontent.com/nicedreamzapp/claude-code-local/main/install.ps1 | iex
@@ -37,8 +38,9 @@ function Install-ClaudeCodeLocal {
     browser   = @{ Name = "browser-broker"; Url = "$Raw/browser-agent/main/broker/windows/get.ps1";  What = "agents share your real browser without stealing your tabs" }
     remote    = @{ Name = "FiaOS";          Url = "$Raw/FiaOS/main/windows/install.ps1";             What = "your desktop and a terminal from any browser tab" }
     terminal  = @{ Name = "Trinidad Head";  Url = "$Raw/trinidad-head/main/install.ps1";             What = "the terminal we recommend for local models" }
+    voice     = @{ Name = "NarrateClaude";  Url = "$Raw/NarrateClaude/main/install.ps1";             What = "talk to Claude Code and hear it answer (local whisper.cpp + Piper)" }
   }
-  $Alias = @{ fiaos = "remote"; broker = "browser"; "browser-broker" = "browser"; trinidad = "terminal"; "trinidad-head" = "terminal" }
+  $Alias = @{ fiaos = "remote"; broker = "browser"; "browser-broker" = "browser"; trinidad = "terminal"; "trinidad-head" = "terminal"; narrate = "voice"; narrateclaude = "voice" }
 
   function Test-Interactive {
     if ($env:CCL_NONINTERACTIVE -eq "1") { return $false }

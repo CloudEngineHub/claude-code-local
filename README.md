@@ -157,7 +157,7 @@ curl -fsSL https://raw.githubusercontent.com/nicedreamzapp/claude-code-local/mai
 
 | Add-on | What it gives you | Mac | Windows |
 |---|---|:---:|:---:|
-| `voice` | [NarrateClaude](https://github.com/nicedreamzapp/NarrateClaude): talk to Claude Code and hear it answer | ✅ | |
+| `voice` | [NarrateClaude](https://github.com/nicedreamzapp/NarrateClaude): talk to Claude Code and hear it answer | ✅ | ✅ |
 | `moonstone` | [Moonstone](https://github.com/nicedreamzapp/moonstone): every session on every machine in one window, push to talk | ✅ | ✅ |
 | `browser` | [browser-agent](https://github.com/nicedreamzapp/browser-agent): agents use your real, logged in browser, each in its own tab | ✅ | ✅ |
 | `phone` | [claude-screen-to-phone](https://github.com/nicedreamzapp/claude-screen-to-phone): drive Claude Code from your iPhone over iMessage | ✅ | |
@@ -247,8 +247,9 @@ You need **git**, **Python 3**, and **Claude Code** installed. When it finishes,
 On Windows the installer then offers the add-ons that run there, each installed by its own repo's
 installer: **moonstone** ([Moonstone](https://github.com/nicedreamzapp/moonstone)), **browser**
 ([browser-broker](https://github.com/nicedreamzapp/browser-agent)), **remote**
-([FiaOS](https://github.com/nicedreamzapp/FiaOS)) and **terminal**
-([Trinidad Head](https://github.com/nicedreamzapp/trinidad-head)). To skip the menu, set
+([FiaOS](https://github.com/nicedreamzapp/FiaOS)), **terminal**
+([Trinidad Head](https://github.com/nicedreamzapp/trinidad-head)) and **voice**
+([NarrateClaude](https://github.com/nicedreamzapp/NarrateClaude)). To skip the menu, set
 `$env:CCL_WITH = "all"` (or `"moonstone,terminal"`, or `"none"`) before the one-liner. Uninstall
 (set `$env:CCL_WITH = "all"` first to remove the add-ons too; models and user data are kept unless
 `$env:CCL_PURGE = "1"`):
@@ -359,7 +360,7 @@ on your hardware. If Claude Code on your own Mac was the part you wanted, this i
 | | Project | What it does |
 |---|---|---|
 | 🌊 | **[Trinidad Head](https://github.com/nicedreamzapp/trinidad-head)** | A terminal for Mac and Windows, written from scratch in Rust, that gives every window its own glow color and puts your own prompts in a bubble so they are easy to find |
-| 🎤 | [NarrateClaude](https://github.com/nicedreamzapp/NarrateClaude) | A hands-free voice loop for Claude Code on macOS that turns your speech into text on the Mac, types it into the Terminal running `claude`, and reads the replies aloud |
+| 🎤 | [NarrateClaude](https://github.com/nicedreamzapp/NarrateClaude) | A hands-free voice loop for Claude Code on macOS, Linux and Windows that turns your speech into text locally with whisper.cpp, types it into `claude`, and reads the replies aloud with a local Piper voice |
 | 🌐 | [browser-agent](https://github.com/nicedreamzapp/browser-agent) | An agent that takes a task in plain English and carries it out in your real Brave browser and your shell, with the model running on your Mac |
 | 🚦 | [browser-broker](https://github.com/nicedreamzapp/browser-broker) | A local proxy on Chrome's debug port that gives each AI agent its own tab in your real, logged-in browser, so agents can't grab each other's tabs or yours |
 | 📱 | [claude-screen-to-phone](https://github.com/nicedreamzapp/claude-screen-to-phone) | macOS scripts that let you text commands from your iPhone into a Claude Code session on your Mac and get text, images and video back in iMessage |
