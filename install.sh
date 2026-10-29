@@ -8,10 +8,26 @@
 #   macOS (Apple Silicon) -> setup.sh         MLX, on-device
 #   Linux                 -> portable/setup-linux.sh   llama.cpp + a vision model
 # Windows users run install.ps1 instead (see the README).
+#
+# Add-ons (macOS): after the model is set up you get a menu. Skip it with:
+#   curl -fsSL .../install.sh | bash -s -- --with voice,browser,phone,remote,moonstone,failover
+#   curl -fsSL .../install.sh | bash -s -- --with all
+#   curl -fsSL .../install.sh | bash -s -- --no-addons
 
 set -euo pipefail
 
-REPO_URL="https://github.com/nicedreamzapp/claude-code-local"
+SETUP_ARGS=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --with) SETUP_ARGS+=("--with" "${2:-}"); shift ;;
+    --with=*|--all|--no-addons) SETUP_ARGS+=("$1") ;;
+    -h|--help) sed -n '2,17p' "$0" 2>/dev/null || true; exit 0 ;;
+    *) echo "✗ Unknown option: $1"; exit 1 ;;
+  esac
+  shift
+done
+
+REPO_URL="${CCL_REPO:-https://github.com/nicedreamzapp/claude-code-local}"
 INSTALL_DIR="${CCL_DIR:-$HOME/claude-code-local}"
 OS="$(uname -s)"
 
@@ -76,7 +92,10 @@ fi
 echo ""
 cd "$INSTALL_DIR"
 if [ "$OS" = "Darwin" ]; then
-  exec bash setup.sh
+  exec bash setup.sh ${SETUP_ARGS[@]+"${SETUP_ARGS[@]}"}
 else
+  if [ ${#SETUP_ARGS[@]} -gt 0 ]; then
+    echo "  (add-ons are macOS only for now; ignoring ${SETUP_ARGS[*]})"
+  fi
   exec bash portable/setup-linux.sh
 fi

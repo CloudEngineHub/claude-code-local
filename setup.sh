@@ -3,9 +3,27 @@
 # Apple Silicon only. Installs MLX, downloads a model from the lineup,
 # and creates a desktop launcher that runs Claude Code 100% on-device.
 #
-# Usage: bash setup.sh
+# Usage: bash setup.sh [--with voice,browser,phone,remote,moonstone,failover | --with all] [--no-addons]
+#
+# After the model is set up it offers the add-ons (scripts/addons.sh). --with installs
+# them without asking; with no terminal and no --with, none are installed.
+# CCL_SKIP_MODEL=1 skips the mlx-lm install and the model download (for testing).
 
 set -e
+
+WITH="${CCL_WITH:-}"
+NO_ADDONS=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --with) WITH="${WITH:+$WITH,}${2:-}"; shift ;;
+    --with=*) WITH="${WITH:+$WITH,}${1#--with=}" ;;
+    --all) WITH="all" ;;
+    --no-addons) NO_ADDONS=1 ;;
+    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+    *) echo "Unknown option: $1 (try --help)"; exit 1 ;;
+  esac
+  shift
+done
 
 echo ""
 echo "╔══════════════════════════════════════════════════╗"
@@ -46,9 +64,13 @@ if [ ! -d "$MLX_VENV" ]; then
   python3.12 -m venv "$MLX_VENV"
 fi
 
-echo "Installing mlx-lm into virtualenv..."
-"$MLX_VENV/bin/pip" install --quiet --upgrade pip
-"$MLX_VENV/bin/pip" install --quiet --upgrade mlx-lm
+if [ "${CCL_SKIP_MODEL:-0}" = "1" ]; then
+  echo "CCL_SKIP_MODEL=1: skipping the mlx-lm install"
+else
+  echo "Installing mlx-lm into virtualenv..."
+  "$MLX_VENV/bin/pip" install --quiet --upgrade pip
+  "$MLX_VENV/bin/pip" install --quiet --upgrade mlx-lm
+fi
 
 # ── Pick a model from the lineup ──────────────────────────────
 echo ""
@@ -83,12 +105,16 @@ echo "Model ID: $MODEL_ID"
 echo ""
 
 # ── Download model ────────────────────────────────────────────
-echo "Downloading $MODEL_ID (one time, 5-30 GB)..."
-"$MLX_VENV/bin/python3" - <<PY
+if [ "${CCL_SKIP_MODEL:-0}" = "1" ]; then
+  echo "CCL_SKIP_MODEL=1: skipping the download of $MODEL_ID"
+else
+  echo "Downloading $MODEL_ID (one time, 5-30 GB)..."
+  "$MLX_VENV/bin/python3" - <<PY
 from mlx_lm.utils import load
 load("$MODEL_ID")
 print("Done.")
 PY
+fi
 
 # ── Install MLX server ────────────────────────────────────────
 # We install it as a symlink into this repo, not a copy. That way if you edit
@@ -164,40 +190,17 @@ cat <<HOOK
   }
 HOOK
 
-# ── Optional: iMessage / Screen-to-Phone tools ────────────────
-echo ""
-echo "Checking for optional iMessage phone-control tools..."
-CLAUDE_DIR="$HOME/.claude"
-mkdir -p "$CLAUDE_DIR"
-
-PHONE_SCRIPTS=(
-  "scripts/imessage-send.sh"
-  "scripts/imessage-send-image.sh"
-  "scripts/imessage-send-video.sh"
-  "scripts/imessage-toggle.sh"
-  "scripts/imessage-receive.sh"
-)
-
-MISSING=0
-for s in "${PHONE_SCRIPTS[@]}"; do
-  if [ -f "$SCRIPT_DIR/$s" ]; then
-    cp "$SCRIPT_DIR/$s" "$CLAUDE_DIR/$(basename $s)"
-    chmod +x "$CLAUDE_DIR/$(basename $s)"
-  else
-    MISSING=1
-  fi
-done
-
-if [ "$MISSING" -eq 0 ]; then
-  echo "  ✅ Phone tools installed to ~/.claude/"
-  if [ -f "$SCRIPT_DIR/config.example.sh" ] && [ ! -f "$SCRIPT_DIR/config.sh" ]; then
-    cp "$SCRIPT_DIR/config.example.sh" "$SCRIPT_DIR/config.sh"
-    echo "  → Edit config.sh with your iPhone number + Apple ID"
-  fi
-  cp "$SCRIPT_DIR/config.sh" "$CLAUDE_DIR/screen-to-phone-config.sh" 2>/dev/null || true
+# ── Add-ons: voice, browser, phone, remote screen, Moonstone, failover ──
+# Each one is installed by its own repo's one-line installer (scripts/addons.sh).
+# The iMessage phone scripts now come from the "phone" add-on (claude-screen-to-phone),
+# which puts them in ~/.claude/ exactly where this script used to.
+if [ "$NO_ADDONS" = "1" ]; then
+  echo ""
+  echo "Skipping add-ons (--no-addons). Add them later: bash scripts/addons.sh menu"
+elif [ -n "$WITH" ]; then
+  bash "$SCRIPT_DIR/scripts/addons.sh" install "$WITH" || echo "  (setup itself finished; see the add-on messages above)"
 else
-  echo "  ℹ️  Phone scripts not bundled — clone them separately if you want phone control:"
-  echo "     https://github.com/nicedreamzapp/claude-screen-to-phone"
+  bash "$SCRIPT_DIR/scripts/addons.sh" menu || echo "  (setup itself finished; see the add-on messages above)"
 fi
 
 echo ""
@@ -215,6 +218,8 @@ echo "║                                                  ║"
 echo "║  Want a different model? See launchers/ for      ║"
 echo "║  Gemma 4 Code, Qwen 3.8 Code, Browser Agent,     ║"
 echo "║  and Narrative Gemma launchers.                  ║"
+echo "║                                                  ║"
+echo "║  Add-ons any time: bash scripts/addons.sh menu   ║"
 echo "║                                                  ║"
 echo "╚══════════════════════════════════════════════════╝"
 echo ""

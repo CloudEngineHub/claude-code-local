@@ -2,21 +2,32 @@
 # Claude Code Local — Uninstall
 # Removes everything setup.sh created. Does NOT uninstall Homebrew or Python.
 #
-# Usage: bash uninstall.sh [--keep-models]
+# Usage: bash uninstall.sh [--keep-models] [--with voice,browser,... | --all] [--purge]
 #   --keep-models   Skip deleting downloaded HuggingFace models (can be 18-75 GB)
+#   --with LIST     Also remove these add-ons (voice browser phone remote moonstone failover)
+#   --all           Also remove every add-on
+#   --purge         With --with/--all: add-ons delete their data and config too
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 KEEP_MODELS=0
-for arg in "$@"; do
-  case "$arg" in
+WITH=""
+PURGE=""
+while [ $# -gt 0 ]; do
+  case "$1" in
     --keep-models) KEEP_MODELS=1 ;;
+    --with) WITH="${WITH:+$WITH,}${2:-}"; shift ;;
+    --with=*) WITH="${WITH:+$WITH,}${1#--with=}" ;;
+    --all) WITH="all" ;;
+    --purge) PURGE="--purge" ;;
     -h|--help)
-      echo "Usage: bash uninstall.sh [--keep-models]"
-      echo "  --keep-models   Keep downloaded HuggingFace model weights"
+      sed -n '5,9p' "$0"
       exit 0
       ;;
+    *) echo "Unknown option: $1 (try --help)"; exit 1 ;;
   esac
+  shift
 done
 
 echo ""
@@ -57,42 +68,22 @@ else
   echo "· MLX virtualenv not found (already removed)"
 fi
 
-# ── Phone/iMessage scripts ────────────────────────────────────
-CLAUDE_DIR="$HOME/.claude"
-PHONE_SCRIPTS=(
-  "imessage-send.sh"
-  "imessage-send-image.sh"
-  "imessage-send-video.sh"
-  "imessage-toggle.sh"
-  "imessage-receive.sh"
-  "screen-to-phone-config.sh"
-)
+# The iMessage phone scripts in ~/.claude/ belong to the "phone" add-on
+# (claude-screen-to-phone); remove them with --with phone.
 
-phone_removed=0
-for s in "${PHONE_SCRIPTS[@]}"; do
-  if [ -f "$CLAUDE_DIR/$s" ]; then
-    rm "$CLAUDE_DIR/$s"
-    phone_removed=$((phone_removed + 1))
+# ── Stop the running MLX server ───────────────────────────────
+# Only a server started from our server.py; anything else on the port is left alone.
+CCL_PORT="${CCL_PORT:-4000}"
+MLX_PID=$(lsof -ti "tcp:$CCL_PORT" -sTCP:LISTEN 2>/dev/null || true)
+stopped=0
+for pid in $MLX_PID; do
+  if ps -o command= -p "$pid" 2>/dev/null | grep -q "mlx-native-server/server.py\|proxy/server.py"; then
+    kill "$pid" 2>/dev/null || true
+    echo "✓ Stopped MLX server (PID $pid)"
+    stopped=1
   fi
 done
-
-if [ "$phone_removed" -gt 0 ]; then
-  echo "✓ Removed $phone_removed phone/iMessage scripts from $CLAUDE_DIR/"
-  removed=$((removed + phone_removed))
-else
-  echo "· No phone scripts found (already removed)"
-fi
-
-# ── Kill running MLX server ───────────────────────────────────
-if lsof -i :4000 >/dev/null 2>&1; then
-  MLX_PID=$(lsof -ti :4000 2>/dev/null || true)
-  if [ -n "$MLX_PID" ]; then
-    kill "$MLX_PID" 2>/dev/null || true
-    echo "✓ Stopped MLX server (PID $MLX_PID)"
-  fi
-else
-  echo "· No MLX server running on :4000"
-fi
+[ "$stopped" -eq 1 ] || echo "· No Claude Code Local server running on :$CCL_PORT"
 
 # ── MLX server log ────────────────────────────────────────────
 if [ -f /tmp/mlx-server.log ]; then
@@ -122,7 +113,7 @@ elif [ -d "$HF_CACHE" ]; then
   for d in "${MODEL_DIRS[@]}"; do
     if [ -d "$HF_CACHE/$d" ]; then
       SIZE=$(du -sh "$HF_CACHE/$d" 2>/dev/null | cut -f1)
-      rm -rf "$HF_CACHE/$d"
+      rm -rf "${HF_CACHE:?}/$d"
       echo "✓ Removed model $d ($SIZE)"
       models_removed=$((models_removed + 1))
     fi
@@ -135,6 +126,11 @@ else
   echo "· No HuggingFace cache found"
 fi
 
+# ── Add-ons (each repo's own uninstaller) ─────────────────────
+if [ -n "$WITH" ]; then
+  bash "$SCRIPT_DIR/scripts/addons.sh" uninstall "$WITH" ${PURGE:+"$PURGE"} || true
+fi
+
 echo ""
 echo "╔══════════════════════════════════════════════════╗"
 echo "║     Uninstall complete.                          ║"
@@ -145,6 +141,7 @@ echo "║  · Homebrew                                      ║"
 echo "║  · Python 3.12                                   ║"
 echo "║  · Claude Code CLI                               ║"
 echo "║                                                  ║"
+echo "║  Add-ons stay unless you pass --with or --all.   ║"
 echo "║  To reinstall: bash setup.sh                     ║"
 echo "║                                                  ║"
 echo "╚══════════════════════════════════════════════════╝"
