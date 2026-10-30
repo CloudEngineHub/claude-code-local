@@ -19,6 +19,8 @@
 <a href="LICENSE"><img src="https://img.shields.io/badge/📜_License-MIT-yellow?style=for-the-badge" alt="MIT"></a>
 <a href="https://discord.gg/ZdSqgAxUW"><img src="https://img.shields.io/discord/1497121921580404818?label=Discord&logo=discord&color=5865F2&style=for-the-badge" alt="Discord"></a>
 
+<a href="https://www.youtube.com/watch?v=XNSdQtlTwWo"><img src="https://raw.githubusercontent.com/nicedreamzapp/claude-code-local/587a5449e6f497cd51fc9e1cbc0ce5ee05237368/assets/readme/promo-video-thumb.jpg" width="640" alt="Watch the video: Claude Code Local, an AI that runs on your own computer, free, private and offline"></a>
+
 </div>
 
 **In one sentence:** a small Python server ([`proxy/server.py`](proxy/server.py)) runs open AI models on your Mac's chip with Apple's MLX and answers Claude Code in Anthropic's own API format, so Claude Code works with no cloud model and no API key.
