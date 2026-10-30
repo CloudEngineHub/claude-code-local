@@ -551,9 +551,129 @@ def _gemma4_args(args_str):
     return parsed if isinstance(parsed, dict) else None
 
 
-def parse_tool_calls(text):
+def _tool_schemas(tools):
+    """{name: JSON schema} from Anthropic tools ({name, input_schema}) or the
+    HuggingFace/OpenAI shape convert_tools_for_llm produces."""
+    schemas = {}
+    for t in tools or []:
+        if not isinstance(t, dict):
+            continue
+        fn = t.get("function") if isinstance(t.get("function"), dict) else t
+        name = fn.get("name")
+        if name:
+            schema = fn.get("input_schema") or fn.get("parameters") or {}
+            schemas[name] = schema if isinstance(schema, dict) else {}
+    return schemas
+
+
+def _fits_schema(args, schema):
+    """True when args is a dict that has every required key and no key the
+    schema does not declare. Used to accept a recovered tool call only when it
+    is unambiguous."""
+    if not isinstance(args, dict) or not args:
+        return False
+    props = schema.get("properties") or {}
+    required = schema.get("required") or []
+    if any(k not in args for k in required):
+        return False
+    return not props or all(k in props for k in args)
+
+
+def _recover_gemma4_missing_opener(text, tools):
+    """Gemma 4 tool calls that lost their opening marker.
+
+    On long calls (a Write whose content is a whole HTML page) Gemma 4 31B
+    8-bit sometimes drops the <|tool_call>call:Write{content:<|"|> head and
+    starts straight into the value, so the output ends like
+        ...</html>\\n<|"|>,file_path:<|"|>budget.html<|"|>}<tool_call|>
+    Format 0 never sees it (no opener), the file is never written, and the
+    raw page is shown to the user as text. 4 of 4 tries on 10/29.
+
+    The closer <tool_call|> and the <|"|> delimiters are Gemma special tokens
+    that never appear in prose, so they anchor the recovery. A call is only
+    accepted when it names (or schema-matches exactly one) declared tool and
+    its arguments fit that tool's schema. Three shapes, most explicit first:
+      a) the name survived:            call:Write{...}<tool_call|>  /  Write{...}
+      b) the name is gone too:         {file_path:<|"|>..<|"|>,content:..}<tool_call|>
+      c) the first key is gone too:    <page>..<|"|>,file_path:<|"|>..<|"|>}<tool_call|>
+    Returns (tool_calls, remaining_text) or ([], text).
+    """
+    schemas = _tool_schemas(tools)
+    if not schemas or "<tool_call|>" not in text:
+        return [], text
+    Q = '<|"|>'
+    calls, kept, start = [], [], 0
+    for closer in re.finditer(r'<tool_call\|>', text):
+        segment = text[start:closer.start()]
+        start = closer.end()
+        body_end = segment.rstrip().rstrip(">").rstrip()
+        if not body_end.endswith("}"):
+            kept.append(segment)
+            continue
+        body_end = body_end[:-1]
+        found = None
+
+        # a) a declared tool name followed by its argument list.
+        names = "|".join(re.escape(n) for n in sorted(schemas, key=len, reverse=True))
+        for m in re.finditer(rf'(?:<\|tool_call>|<tool_call:|call:)?(?<![\w.-])({names})\s*\{{', body_end):
+            args = _gemma4_args(body_end[m.end():])
+            if _fits_schema(args, schemas[m.group(1)]):
+                found = (m.start(), m.group(1), args)
+                break
+
+        # b) a bare argument list; the schema has to pick exactly one tool.
+        if not found:
+            brace = body_end.find("{")
+            # A name right before the brace is a tool the client never
+            # declared (else (a) had it); don't re-route it to another tool.
+            named = re.search(r'[\w.-]\s*$', body_end[:brace]) if brace >= 0 else None
+            if brace >= 0 and not named and Q in body_end[brace:]:
+                args = _gemma4_args(body_end[brace + 1:])
+                fits = [n for n, s in schemas.items() if _fits_schema(args, s)]
+                if len(fits) == 1:
+                    found = (brace, fits[0], args)
+
+        # c) the value of the first argument starts the segment; the one
+        #    required string key the rest of the call lacks is its name.
+        if not found and Q in body_end:
+            first_q = body_end.find(Q)
+            tail = body_end[first_q:]
+            if re.match(r'<\|"\|>\s*,\s*[\w-]+\s*:', tail):
+                rest = _gemma4_args(tail[len(Q):].lstrip().lstrip(","))
+                if isinstance(rest, dict):
+                    options = []
+                    for n, s in schemas.items():
+                        props = s.get("properties") or {}
+                        missing = [k for k in s.get("required") or [] if k not in rest]
+                        if (len(missing) == 1
+                                and (props.get(missing[0]) or {}).get("type", "string") == "string"):
+                            args = dict(rest, **{missing[0]: body_end[:first_q].strip("\n")})
+                            if _fits_schema(args, s):
+                                options.append((n, args))
+                    if len(options) == 1:
+                        found = (0, options[0][0], options[0][1])
+
+        if found:
+            pos, name, args = found
+            kept.append(segment[:pos])
+            calls.append({"name": name, "arguments": args})
+            log(f"  Gemma4 tool call with no opening marker recovered: {name}({list(args.keys())})")
+        else:
+            kept.append(segment)
+            kept.append(closer.group(0))
+    if not calls:
+        return [], text
+    kept.append(text[start:])
+    return calls, "".join(kept).strip()
+
+
+def parse_tool_calls(text, tools=None):
     """Parse tool calls from generated text. Handles multiple formats including
     Gemma 4 native format. Returns (list of tool calls, remaining text).
+
+    tools: the tools the request declared (Anthropic or HF shape). Only used to
+    recover calls whose opening marker the model dropped; without it that
+    recovery is off, so a guess can never name a tool the client didn't offer.
     """
     tool_calls = []
 
@@ -622,6 +742,13 @@ def parse_tool_calls(text):
                 log(f"  Gemma4 no args parsed: {content[:80]}")
         if tool_calls:
             return tool_calls, remaining.strip()
+
+    # Format 0b: Gemma 4 with the opening marker missing (long Write calls).
+    # Needs the declared tools; see _recover_gemma4_missing_opener.
+    if tools:
+        recovered, rest = _recover_gemma4_missing_opener(text, tools)
+        if recovered:
+            return recovered, rest
 
     remaining = text
 
@@ -1453,6 +1580,9 @@ TOOL_INTENT_PHRASES = [
     "here's the command", "bash(", "read(", "edit(", "write(",
     "<tool_call>", "<function=", "<tools>", '"name":', '"arguments":',
     '"parameters":', "```json", "```tool",
+    # Gemma 4's closing marker: a call whose opener was lost and could not
+    # be recovered still gets the re-prompt instead of going out as text.
+    "<tool_call|>",
 ]
 
 
@@ -1885,7 +2015,7 @@ def generate_response(body, on_start=None, on_text=None):
     # gets the text as written: otherwise a JSON answer could come back as a
     # tool_use for a tool the client never offered.
     if llm_tools:
-        tool_calls, remaining_text = parse_tool_calls(text)
+        tool_calls, remaining_text = parse_tool_calls(text, llm_tools)
     else:
         tool_calls, remaining_text = [], text
 
@@ -1930,7 +2060,7 @@ def generate_response(body, on_start=None, on_text=None):
             retry_text += retry_tf.flush()
 
             retry_text = clean_response(retry_text)
-            retry_calls, retry_remaining = parse_tool_calls(retry_text)
+            retry_calls, retry_remaining = parse_tool_calls(retry_text, llm_tools)
             gen_tokens += retry_gen
 
             if retry_calls:

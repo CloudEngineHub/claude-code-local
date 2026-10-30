@@ -84,6 +84,7 @@ Local models write tool calls in many shapes. `parse_tool_calls` tries these in 
 | Format | Example | Typical source |
 |---|---|---|
 | Gemma 4 native | `<|tool_call>call:Bash{command:<|"|>ls<|"|>}<tool_call|>`, also `<tool_call:Name{...}` and no `call:` prefix | Gemma 4 |
+| Gemma 4 with the opener missing | `...</html><|"|>,file_path:<|"|>budget.html<|"|>}<tool_call|>`: recovered only when it names, or its arguments fit, exactly one declared tool | Gemma 4 31B 8-bit on long Write calls |
 | Raw JSON object with `"type": "function"` | `{"type":"function","name":"Bash","parameters":{...}}` | Llama 3.3 |
 | `<tool_call>` JSON, object or array | `<tool_call>{"name":"Bash","arguments":{...}}</tool_call>` | Qwen, Hermes and many others |
 | `<function=Name><parameter=key>` XML | inside or outside `<tool_call>` | Qwen-style XML |

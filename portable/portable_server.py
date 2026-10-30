@@ -268,7 +268,7 @@ def generate_response(body):
     log(f"  Generated: {gen_tokens} tokens in {elapsed:.1f}s ({tps:.1f} tok/s)")
 
     text = S.clean_response(full_text)
-    tool_calls, remaining_text = S.parse_tool_calls(text)
+    tool_calls, remaining_text = S.parse_tool_calls(text, llm_tools)
 
     # Same tool-intent retry as the MLX path, over HTTP instead of stream_generate.
     if (llm_tools and not tool_calls
@@ -287,7 +287,7 @@ def generate_response(body):
             ]
             retry_text, retry_usage = llama_chat(retry_messages, max_tokens, temperature)
             gen_tokens += retry_usage.get("completion_tokens") or 0
-            retry_calls, retry_remaining = S.parse_tool_calls(S.clean_response(retry_text))
+            retry_calls, retry_remaining = S.parse_tool_calls(S.clean_response(retry_text), llm_tools)
             if retry_calls:
                 tool_calls = retry_calls
                 log(f"  Retry succeeded: {', '.join(tc['name'] for tc in retry_calls)}")

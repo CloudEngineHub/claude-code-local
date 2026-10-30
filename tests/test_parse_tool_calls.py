@@ -270,3 +270,103 @@ def test_recover_without_a_name_gives_up():
 
 def test_recover_unknown_tool_with_no_arguments_gives_up():
     assert recover_garbled_tool_json('{"name": "Mystery"}') is None
+
+
+# ─── Format 0b: Gemma 4 call with the opening marker missing ─────────────────
+# Gemma 4 31B 8-bit, 10/29, Claude Code asked for budget.html: 4 of 4 tries
+# ended with the page printed as text and no file. The output had the closer
+# and the <|"|> delimiters but no <|tool_call>call:Write{content: head.
+
+CLAUDE_CODE_TOOLS = [
+    {"name": "Bash", "input_schema": {"type": "object", "required": ["command"],
+        "properties": {"command": {"type": "string"}, "timeout": {"type": "number"}}}},
+    {"name": "Read", "input_schema": {"type": "object", "required": ["file_path"],
+        "properties": {"file_path": {"type": "string"}, "limit": {"type": "number"}}}},
+    {"name": "Write", "input_schema": {"type": "object", "required": ["file_path", "content"],
+        "properties": {"file_path": {"type": "string"}, "content": {"type": "string"}}}},
+    {"name": "Edit", "input_schema": {"type": "object",
+        "required": ["file_path", "old_string", "new_string"],
+        "properties": {"file_path": {"type": "string"}, "old_string": {"type": "string"},
+                       "new_string": {"type": "string"}, "replace_all": {"type": "boolean"}}}},
+]
+
+PAGE = ('<!DOCTYPE html>\n<html lang="en">\n<head>\n    <title>Monthly Budget</title>\n'
+        '    <style>body { font-family: system-ui; }</style>\n</head>\n<body>\n'
+        '    <div class="total-row"><span class="total-amount">$2,780.00</span></div>\n'
+        '<script>const x = {"a": 1};</script>\n</body>\n</html>\n')
+
+
+def tcalls(text, tools=CLAUDE_CODE_TOOLS):
+    found, rest = parse_tool_calls(text, tools)
+    return [(c["name"], c["arguments"]) for c in found], rest
+
+
+def test_budget_write_with_no_opener_and_no_first_key_is_recovered():
+    # The tail on screen: ...</html>\n<|"|>,file_path:<|"|>budget.html<|"|>}<tool_call|>
+    text = f'{PAGE}{Q},file_path:{Q}budget.html{Q}}}<tool_call|>'
+    found, rest = tcalls(text)
+    assert found == [("Write", {"file_path": "budget.html", "content": PAGE.rstrip("\n")})]
+    assert rest == ""
+
+
+def test_budget_write_with_name_but_no_opener_is_recovered():
+    text = f'call:Write{{content:{Q}{PAGE}{Q},file_path:{Q}budget.html{Q}}}<tool_call|>'
+    assert tcalls(text) == ([("Write", {"content": PAGE, "file_path": "budget.html"})], "")
+
+
+def test_prose_before_a_named_call_stays_as_text():
+    text = f'Here is the page.\nWrite{{file_path:{Q}b.html{Q},content:{Q}{PAGE}{Q}}}<tool_call|>'
+    assert tcalls(text) == ([("Write", {"file_path": "b.html", "content": PAGE})],
+                            "Here is the page.")
+
+
+def test_nameless_argument_list_matched_to_the_one_tool_it_fits():
+    text = f'{{file_path:{Q}a.py{Q},old_string:{Q}x{Q},new_string:{Q}y{Q}}}<tool_call|>'
+    assert tcalls(text)[0] == [("Edit", {"file_path": "a.py", "old_string": "x", "new_string": "y"})]
+
+
+def test_nameless_argument_list_that_fits_two_tools_is_not_guessed():
+    # Two declared tools take the same arguments: no way to tell which was meant.
+    tools = [{"name": "A", "input_schema": {"required": ["path"], "properties": {"path": {}}}},
+             {"name": "B", "input_schema": {"required": ["path"], "properties": {"path": {}}}}]
+    text = f'{{path:{Q}/x{Q}}}<tool_call|>'
+    assert tcalls(text, tools)[0] == []
+
+
+def test_undeclared_tool_name_is_not_recovered():
+    text = f'call:Delete{{file_path:{Q}/x{Q},content:{Q}y{Q}}}<tool_call|>'
+    found, rest = tcalls(text)
+    assert found == [] and "<tool_call|>" in rest
+
+
+def test_arguments_that_do_not_fit_the_schema_are_not_recovered():
+    text = f'Write{{file_path:{Q}/x{Q},colour:{Q}y{Q}}}<tool_call|>'
+    assert tcalls(text)[0] == []
+
+
+def test_no_recovery_without_declared_tools():
+    text = f'{PAGE}{Q},file_path:{Q}budget.html{Q}}}<tool_call|>'
+    assert parse_tool_calls(text)[0] == []
+
+
+def test_code_block_with_json_is_not_a_tool_call():
+    text = ('Here is a config:\n```json\n{"file_path": "budget.html", "content": "<html></html>"}\n```\n'
+            'Save it as config.json.')
+    found, rest = tcalls(text)
+    assert found == [] and rest == text
+
+
+def test_prose_naming_a_tool_is_not_a_tool_call():
+    text = "I would use Write{file_path, content} or Read to do that, then Bash to run it."
+    found, rest = tcalls(text)
+    assert found == [] and rest == text
+
+
+def test_full_gemma4_call_still_wins_with_tools_declared():
+    text = f'<|tool_call>call:Write{{file_path:{Q}a{Q},content:{Q}b{Q}}}<tool_call|>'
+    assert tcalls(text) == ([("Write", {"file_path": "a", "content": "b"})], "")
+
+
+def test_dangling_closer_counts_as_tool_intent_for_the_retry():
+    from server import TOOL_INTENT_PHRASES
+    assert any(p in f'{PAGE}{Q}}}<tool_call|>'.lower() for p in TOOL_INTENT_PHRASES)

@@ -44,6 +44,24 @@ def test_tool_call_becomes_tool_use_block_with_no_empty_text(fake_model):
     assert block["input"] == {"command": "ls"}
 
 
+WRITE = {"name": "Write", "input_schema": {"type": "object", "properties": {
+    "file_path": {"type": "string"}, "content": {"type": "string"}},
+    "required": ["file_path", "content"]}}
+
+
+def test_gemma4_write_with_no_opening_marker_still_writes_the_file(fake_model):
+    # Gemma 4 31B 8-bit on a long Write (10/29): the page streams out with only
+    # the tail of the call, and before the fix it came back as plain text.
+    page = "<!DOCTYPE html>\n<html><body>Rent $1,200</body></html>"
+    fake_model.outputs = [page + '\n<|"|>,file_path:<|"|>budget.html<|"|>}<tool_call|>']
+    r = server.generate_response(body(tools=[BASH, WRITE]))
+    assert r["stop_reason"] == "tool_use"
+    assert [b["type"] for b in r["content"]] == ["tool_use"]
+    assert r["content"][0]["name"] == "Write"
+    assert r["content"][0]["input"]["content"] == page
+    assert r["content"][0]["input"]["file_path"].endswith("budget.html")
+
+
 def test_tool_input_keys_outside_the_schema_are_dropped(fake_model):
     fake_model.outputs = ['<tool_call>{"name": "Bash", "arguments": '
                           '{"command": "ls", "description": "list"}}</tool_call>']
