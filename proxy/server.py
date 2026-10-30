@@ -667,6 +667,35 @@ def _recover_gemma4_missing_opener(text, tools):
     return calls, "".join(kept).strip()
 
 
+def _element_params(fname, params_text, tools):
+    """<function=Write> followed by <file_path>..</file_path><content>..</content>.
+
+    Qwen 3.5 0.8B (llama.cpp, phone test 10/30) writes each argument as an
+    element named after the parameter instead of <parameter=file_path>, so the
+    call went out with no arguments and Claude Code stopped after one turn.
+    Only element names that are parameters of the declared tool count, and the
+    result has to fit that tool's schema, so HTML or XML inside a value (a
+    <div> in content) is never read as an argument. Returns {} when it is not
+    that shape.
+    """
+    schema = _tool_schemas(tools).get(fname)
+    if not schema:
+        return {}
+    props = schema.get("properties") or {}
+    arguments = {}
+    pos = 0
+    while True:
+        m = re.compile(r'<(' + "|".join(map(re.escape, props)) + r')>').search(params_text, pos) if props else None
+        if not m:
+            break
+        close = params_text.find(f"</{m.group(1)}>", m.end())
+        if close < 0:
+            break
+        arguments.setdefault(m.group(1), params_text[m.end():close].strip("\n"))
+        pos = close + len(m.group(1)) + 3
+    return arguments if _fits_schema(arguments, schema) else {}
+
+
 def parse_tool_calls(text, tools=None):
     """Parse tool calls from generated text. Handles multiple formats including
     Gemma 4 native format. Returns (list of tool calls, remaining text).
@@ -801,6 +830,8 @@ def parse_tool_calls(text, tools=None):
                 arguments = {}
                 for pmatch in re.finditer(r'<parameter=(\w+)>\s*(.*?)\s*(?:</parameter>|$)', params_text, re.DOTALL):
                     arguments[pmatch.group(1)] = pmatch.group(2).strip()
+                if not arguments:
+                    arguments = _element_params(fname, params_text, tools)
                 if arguments:
                     tool_calls.append({"name": fname, "arguments": arguments})
                     log(f"  Recovered function-in-tag: {fname}")
@@ -823,6 +854,8 @@ def parse_tool_calls(text, tools=None):
             arguments = {}
             for pmatch in re.finditer(r'<parameter=(\w+)>\s*(.*?)\s*</parameter>', params_text, re.DOTALL):
                 arguments[pmatch.group(1)] = pmatch.group(2)
+            if not arguments:
+                arguments = _element_params(func_name, params_text, tools)
             tool_calls.append({"name": func_name, "arguments": arguments})
             remaining = remaining.replace(match.group(0), "", 1)
 

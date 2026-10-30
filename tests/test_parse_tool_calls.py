@@ -370,3 +370,44 @@ def test_full_gemma4_call_still_wins_with_tools_declared():
 def test_dangling_closer_counts_as_tool_intent_for_the_retry():
     from server import TOOL_INTENT_PHRASES
     assert any(p in f'{PAGE}{Q}}}<tool_call|>'.lower() for p in TOOL_INTENT_PHRASES)
+
+
+# ─── <function=Name> with each argument as its own element ───────────────────
+# Qwen 3.5 0.8B Q8_0 on llama.cpp (Android phone test, 10/30): "I'll create
+# add.py" then this call, logged as "function-in-tag but no params" and sent
+# on with no arguments; Claude Code stopped after 1 turn, 2 of 2 tries. The log
+# kept the first 100 chars (through "<conte"); the rest follows that shape.
+ADD_PY_PATH = "/data/data/com.termux/files/home/ccl-test/work/add.py"
+QWEN_ADD_PY = (
+    "I'll create a Python script that adds 2+3 and prints the result.\n\n"
+    "<tool_call>\n<function=Write>\n"
+    f"<file_path>{ADD_PY_PATH}</file_path>\n"
+    "<content>\nresult = 2 + 3\nprint(result)\n</content>\n"
+    "</function>\n</tool_call>"
+)
+
+
+def test_qwen_element_arguments_in_tool_call_tag_are_recovered():
+    found, rest = tcalls(QWEN_ADD_PY)
+    assert found == [("Write", {"file_path": ADD_PY_PATH,
+                                "content": "result = 2 + 3\nprint(result)"})]
+    assert rest == "I'll create a Python script that adds 2+3 and prints the result."
+
+
+def test_qwen_element_arguments_without_tool_call_tag_are_recovered():
+    text = (f"<function=Write>\n<file_path>/w/a.html</file_path>\n"
+            f"<content>\n<div><content>x</content></div>\n</content>\n</function>")
+    # The value's own markup stays inside the value.
+    found, _ = tcalls(text)
+    assert found[0][0] == "Write" and found[0][1]["file_path"] == "/w/a.html"
+    assert found[0][1]["content"].startswith("<div><content>x")
+
+
+def test_element_arguments_need_a_declared_tool_and_its_schema():
+    # Format 2 still passes the bare <function=X> through with no arguments,
+    # as before; what matters is that no argument is read out of the elements.
+    undeclared = "<tool_call>\n<function=Upload>\n<file_path>/a</file_path>\n</function>\n</tool_call>"
+    assert all(args == {} for _, args in tcalls(undeclared)[0])
+    missing = "<tool_call>\n<function=Write>\n<file_path>/a</file_path>\n</function>\n</tool_call>"
+    assert all(args == {} for _, args in tcalls(missing)[0])
+    assert all(c["arguments"] == {} for c in parse_tool_calls(QWEN_ADD_PY)[0])  # no tools, no guess
