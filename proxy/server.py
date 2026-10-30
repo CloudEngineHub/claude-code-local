@@ -1688,6 +1688,61 @@ def fix_bash_timeout(name, args):
     return args
 
 
+# Tool names small models reach for that Claude Code calls something else.
+# Applied only when the target is declared and the alias itself is not, so a
+# client that really offers a "Run" tool still gets its own tool.
+TOOL_NAME_ALIASES = {
+    "run": "Bash", "execute": "Bash", "shell": "Bash", "terminal": "Bash",
+    "runcommand": "Bash", "exec": "Bash",
+    "createfile": "Write", "writefile": "Write", "save": "Write",
+    "readfile": "Read", "open": "Read", "cat": "Read",
+}
+# Argument names that come with those aliases, moved to the real key only
+# when the real key is missing.
+TOOL_ARG_ALIASES = {
+    "Bash": {"command": ("code", "script", "cmd")},
+    "Write": {"file_path": ("path", "filename", "file"), "content": ("text", "contents", "data")},
+    "Read": {"file_path": ("path", "filename", "file")},
+}
+
+
+def resolve_tool_name(name, declared):
+    """The declared tool a call's name means, or the name unchanged.
+
+    Tool names are case-sensitive in Claude Code, and a 0.8B model on the
+    phone test (10/30) called "bash" 30+ times and "Run"/"Execute" for Bash,
+    so every call was rejected and the file it wrote never ran. Exact match
+    first, then one case-insensitive match, then TOOL_NAME_ALIASES. A name
+    that matches no declared tool comes back as is."""
+    if not isinstance(name, str) or not declared or name in declared:
+        return name
+    folded = [d for d in declared if d.lower() == name.lower()]
+    if len(folded) == 1:
+        log(f"  Tool name case fixed: {name} -> {folded[0]}")
+        return folded[0]
+    target = TOOL_NAME_ALIASES.get(re.sub(r'[\s_-]', '', name.lower()))
+    if target in declared and not folded:
+        log(f"  Tool name alias applied: {name} -> {target}")
+        return target
+    return name
+
+
+def alias_tool_args(name, args):
+    """Move code/script/cmd to command for Bash, path to file_path, etc."""
+    if not isinstance(args, dict):
+        return args
+    args = dict(args)
+    for real, alts in TOOL_ARG_ALIASES.get(name, {}).items():
+        if real in args:
+            continue
+        for alt in alts:
+            if alt in args:
+                args[real] = args.pop(alt)
+                log(f"  Tool argument alias applied: {name}.{alt} -> {real}")
+                break
+    return args
+
+
 def assemble_anthropic_message(remaining_text, tool_calls, body, anthropic_tools,
                                prompt_tokens, gen_tokens, finish_reason="end_turn",
                                stop_sequence=None):
@@ -1716,6 +1771,10 @@ def assemble_anthropic_message(remaining_text, tool_calls, body, anthropic_tools
 
         for tc in tool_calls:
             tool_id = f"toolu_{uuid.uuid4().hex[:24]}"
+            resolved = resolve_tool_name(tc.get("name"), tool_schemas)
+            if resolved != tc.get("name"):
+                tc["name"] = resolved
+                tc["arguments"] = alias_tool_args(resolved, tc.get("arguments"))
             raw_input = tc["arguments"] if isinstance(tc.get("arguments"), dict) else {}
             allowed = tool_schemas.get(tc["name"])
             if allowed is not None:

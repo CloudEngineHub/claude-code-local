@@ -1,5 +1,7 @@
 """generate_response in proxy/server.py, driven by a scripted fake model
 (see conftest.FakeModel). Covers the response shape Claude Code depends on."""
+import pytest
+
 import server
 
 
@@ -130,3 +132,61 @@ def test_count_prompt_tokens_matches_generation_prompt(fake_model):
     finally:
         server.CODE_MODE_ENABLED = saved
     assert r["usage"]["input_tokens"] == n
+
+
+# ─── Tool names: case and aliases (phone test 10/30, Qwen 3.5 0.8B) ──────────
+READ = {"name": "Read", "input_schema": {"type": "object", "properties": {
+    "file_path": {"type": "string"}}, "required": ["file_path"]}}
+DECLARED = [BASH, WRITE, READ]
+
+
+def assembled(name, args, tools=DECLARED):
+    r = server.assemble_anthropic_message(
+        "", [{"name": name, "arguments": args}], {"tools": tools}, tools, 10, 5)
+    return r["content"][0]["name"], r["content"][0]["input"]
+
+
+@pytest.mark.parametrize("name", ["bash", "BASH", "Bash", "bAsH"])
+def test_tool_name_case_is_matched_to_the_declared_tool(name):
+    assert assembled(name, {"command": "python3 add.py"}) == ("Bash", {"command": "python3 add.py"})
+
+
+@pytest.mark.parametrize("name", ["Run", "Execute", "Shell", "Terminal", "RunCommand",
+                                  "run_command", "exec", "EXECUTE"])
+def test_shell_aliases_go_to_bash(name):
+    assert assembled(name, {"command": "python3 add.py"}) == ("Bash", {"command": "python3 add.py"})
+
+
+@pytest.mark.parametrize("key", ["code", "script", "cmd"])
+def test_bash_alias_argument_becomes_command(key):
+    assert assembled("Run", {key: "python3 add.py"}) == ("Bash", {"command": "python3 add.py"})
+
+
+@pytest.mark.parametrize("name", ["CreateFile", "WriteFile", "Save", "write_file"])
+def test_write_aliases_go_to_write(name):
+    assert assembled(name, {"path": "/w/add.py", "content": "print(5)"}) == (
+        "Write", {"file_path": "/w/add.py", "content": "print(5)"})
+
+
+@pytest.mark.parametrize("name", ["ReadFile", "Open", "Cat", "read_file"])
+def test_read_aliases_go_to_read(name):
+    assert assembled(name, {"file_path": "/w/add.py"}) == ("Read", {"file_path": "/w/add.py"})
+
+
+def test_undeclared_tool_is_not_mapped_to_anything():
+    assert assembled("Deploy", {"command": "x"}) == ("Deploy", {"command": "x"})
+
+
+def test_alias_target_must_be_declared():
+    assert assembled("Run", {"command": "ls"}, tools=[WRITE, READ])[0] == "Run"
+
+
+def test_declared_alias_name_keeps_its_own_tool():
+    run = {"name": "Run", "input_schema": {"type": "object", "properties": {
+        "code": {"type": "string"}}, "required": ["code"]}}
+    assert assembled("Run", {"code": "1+1"}, tools=[BASH, run]) == ("Run", {"code": "1+1"})
+    assert assembled("run", {"code": "1+1"}, tools=[BASH, run]) == ("Run", {"code": "1+1"})
+
+
+def test_existing_argument_is_not_overwritten_by_an_alias():
+    assert assembled("Run", {"command": "ls", "cmd": "rm -rf /"}) == ("Bash", {"command": "ls"})
