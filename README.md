@@ -6,7 +6,7 @@
 
 **Your Mac's chip runs the AI · Claude Code works exactly like it always does · nothing leaves your computer**
 
-**Now on Linux and Windows too, same Claude Code, same privacy, your own machine doing the work. Phones are next.**
+**Now on Linux and Windows too, same Claude Code, same privacy, your own machine doing the work. [Phones are next.](#-where-this-is-going)**
 
 <a href="https://github.com/hesreallyhim/awesome-claude-code"><img src="https://img.shields.io/badge/Mentioned_in-Awesome_Claude_Code-fc60a8?style=for-the-badge&logo=awesomelists&logoColor=white&labelColor=1f2328" alt="Mentioned in Awesome Claude Code"></a>
 
@@ -369,6 +369,18 @@ from scratch by the same person who made this project, and it makes long local-A
 </p>
 
 👉 **[Get Trinidad Head](https://github.com/nicedreamzapp/trinidad-head)** · [project page](https://nicedreamzwholesale.com/software/trinidad-head/)
+
+### 🔭 Where this is going
+
+Claude Code Local started as a way to keep building when the cloud says no. The bigger idea: **local for the everyday, cloud for the hard stuff.** Most of what we ask an AI to do in a day is small. Read this, fix that, run it, check it. A small model on your own machine can do those jobs fast, free and private, and the big cloud models stay there for the few jobs that really need them.
+
+📱 **Phones are the next computer** · On October 30, 2026 we put a 2B model on a $50, 4 GB Android phone. With no cloud and no signal, Claude Code wrote a small program, ran it, and got the right answer. The same small model writes and runs code inside the Moonstone app on an iPhone at about 22 tokens a second. Both are prototypes and not on the main branch yet, but the brain fits in your pocket today.
+
+🧠 **Built for the model that's coming** · Small models get smarter every few months. Something as smart as today's best cloud model will run on a phone within a few years, and everything here is being built for that day. It's meant for regular people with small computers, not only people with a rack of GPUs.
+
+🎛️ **The right brain for each job** · [Moonstone](https://github.com/nicedreamzapp/moonstone) is the control room. Next comes an auto picker that sends each request to the smallest model that can do it well. It picks a local model when that model fits in the memory you have free right now, and you always keep the final say.
+
+🦾 **Same brain, different bodies** · The brain that runs here also runs the eyes in [RealTime AI Cam](https://github.com/nicedreamzapp/RealTimeAICam), a homestead robot, and the [Sitka](https://github.com/nicedreamzapp/sitka) exoskeleton, where a 6 KB model decides when the clutches lock.
 
 ### 🧩 The local-first family
 
